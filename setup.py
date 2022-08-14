@@ -9,7 +9,7 @@ setuptools.setup(
     author = "Balder Holst",
     author_email = "balderwh@gmail.com",
     packages = ["sqlite_integrated"],
-    description = "Easily manipulate sqlite databases with dictionaries",
+    description = "Easily manipulate sqlite databases with python dictionaries",
     long_description = description,
     long_description_content_type = "text/markdown",
     url = "https://github.com/BalderHolst/sqlite-integrated",
