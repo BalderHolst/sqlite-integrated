@@ -1,0 +1,8 @@
+LICENSE
+README.md
+setup.py
+sqlite_integrated/__init__.py
+sqlite_integrated.egg-info/PKG-INFO
+sqlite_integrated.egg-info/SOURCES.txt
+sqlite_integrated.egg-info/dependency_links.txt
+sqlite_integrated.egg-info/top_level.txt

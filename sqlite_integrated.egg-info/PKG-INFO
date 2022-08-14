@@ -1,0 +1,17 @@
+Metadata-Version: 2.1
+Name: sqlite-integrated
+Version: 0.0.1
+Summary: Easily manipulate sqlite databases with dictionaries
+Home-page: https://github.com/BalderHolst/sqlite-integrated
+Author: Balder Holst
+Author-email: balderwh@gmail.com
+License: MIT
+Platform: UNKNOWN
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
+# Readme
+Readme for sqlite-integrated
+
+
