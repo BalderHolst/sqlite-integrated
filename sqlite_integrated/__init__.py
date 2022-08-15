@@ -1,16 +1,18 @@
 import sqlite3
 import os
 
+class DatabaseException(Exception):
+    """Raised when the database fails to execute command"""
+
 
 class Database:
     """Main database class for manipulating sqlite3 databases"""
 
     # TODO add global silent variable to silence all database prints
-    # TODO add method to pretty print table
 
     def __init__(self, path: str, new = False):
         if not new and not os.path.isfile(path):
-            raise(Exception(f"no database file at \"{path}\". If you want to create one, pass \"new=True\""))
+            raise(DatabaseException(f"no database file at \"{path}\". If you want to create one, pass \"new=True\""))
 
         self.path = path
         """Path to the database file"""
@@ -153,10 +155,10 @@ class Database:
         """Add an entry to the database. The entry must have values for all fields in the table. You can pass ´fill_null=True´ to fill remaining fields with None/null. Use ´silent=True´ to suppress warnings and messages."""
 
         if 'id' in entry:
-            raise Exception(f"Cannot add entry with a preexisting id ({entry['id']})")
+            raise DatabaseException(f"Cannot add entry with a preexisting id ({entry['id']})")
 
         if not self.is_table(table):
-            raise Exception(f"Database has no table with the name \"{table}\". Possible tablenames are: {self.get_table_names()}")
+            raise DatabaseException(f"Database has no table with the name \"{table}\". Possible tablenames are: {self.get_table_names()}")
         
         table_fields = self.get_table_collums(table)[1:] # no id field
 
@@ -164,11 +166,11 @@ class Database:
             if entry_field in table_fields:
                 table_fields.remove(entry_field)
             else:
-                raise Exception(f"The table \"{table}\" has no field by the name of \"{entry_field}\"")
+                raise DatabaseException(f"The table \"{table}\" has no field by the name of \"{entry_field}\"")
 
         if len(table_fields) > 0: # if there are unpopulated fields
             if not fill_null:
-                raise Exception(f"Missing fields to insert into \"{table}\" table: {table_fields}")
+                raise DatabaseException(f"Missing fields to insert into \"{table}\" table: {table_fields}")
             for field in table_fields:
                 entry[field] = None
 
@@ -200,15 +202,15 @@ class Database:
     # TODO implement fill_null
     def update_table_entry(self, table: str, entry: dict, id_field:str = "id", fill_null=False, silent=False):
         if not id_field in entry:
-            raise Exception(f"Cannot update entry as entry has no id.")
+            raise DatabaseException(f"Cannot update entry as entry has no id.")
 
         if not self.is_table(table):
-            raise Exception(f"Database has no table with the name \"{table}\". Possible tablenames are: {self.get_table_names()}")
+            raise DatabaseException(f"Database has no table with the name \"{table}\". Possible tablenames are: {self.get_table_names()}")
         
         # TODO make sure order does not matter
         table_fields = self.get_table_collums(table)
         if table_fields != list(entry):
-            raise Exception(f"Table fields do not match entry fields: {table_fields} != {list(entry)}")
+            raise DatabaseException(f"Table fields do not match entry fields: {table_fields} != {list(entry)}")
 
         data = []
 
@@ -238,8 +240,5 @@ class Database:
         self.conn.close()
 
 if __name__ == "__main__":
-    db = Database("testing/test.db")
-    entry = db.get_table("albums")[1]
-    db.print_table("albums")
-
+    Database("not/path")
 
