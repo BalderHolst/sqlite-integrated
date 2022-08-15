@@ -1,9 +1,9 @@
 This package provides a class to make handeling of sqlite3 databases easier. It makes it possible to add/update database entries with python dictionaries. Database requestes also return tables that can easily be manipulated.
 
-### How to use it!
+## How to use it!
 
-##### Creating a new database
-Start by importing the class and creating our NEW database
+### Creating a new database
+Start by importing the class and creating our NEW database (remember to put in a valid path to the database file)
 ```python
 from sqlite_integrated import Database
 db = Database("path/to/database.db", new=True)
@@ -14,12 +14,11 @@ we pass `new=True` to create a new database file.
 We can now create a table with sql
 
 
-
 ```python
 db.cursor.execute("""CREATE TABLE people (
 id integer PRIMARY KEY,
 first_name text,
-last_name text,
+last_name text
 )""")
 ```
 
@@ -41,7 +40,7 @@ for person in db.get_table("people"):
 ```
 
 
-##### Opening an existing database
+### Opening an existing database
 
 Start by importing the class and opening our database
 ```python

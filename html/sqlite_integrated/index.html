@@ -33,7 +33,7 @@ import os
 class Database:
     &#34;&#34;&#34;Main database class for manipulating sqlite3 databases&#34;&#34;&#34;
 
-    def __init__(self, path, new = False):
+    def __init__(self, path: str, new = False):
         if not new and not os.path.isfile(path):
             raise(Exception(f&#34;no database file at \&#34;{path}\&#34;. If you want to create one, pass \&#34;new=True\&#34;&#34;))
 
@@ -56,18 +56,18 @@ class Database:
             names.append(name[0])
         return(names)
     
-    def is_table(self, table_name):
+    def is_table(self, table_name: str):
         &#34;&#34;&#34;Check if database has a table with a certain name&#34;&#34;&#34;
         if table_name in self.get_table_names():
             return True
         return False
 
-    def get_table_raw(self, name):
+    def get_table_raw(self, name: str):
         &#34;&#34;&#34;Returns all entries in a table as tuples&#34;&#34;&#34;
         self.cursor.execute(f&#34;SELECT * FROM {name}&#34;)
         return(self.cursor.fetchall())
 
-    def get_table(self, name):
+    def get_table(self, name: str):
         &#34;&#34;&#34;Returns all entries in a table as python dictionaries&#34;&#34;&#34;
         tuples = self.get_table_raw(name)
         fields = self.get_table_collums(name)
@@ -83,7 +83,7 @@ class Database:
         return(dict_table)
 
 
-    def get_table_info(self, name):
+    def get_table_info(self, name: str):
         &#34;&#34;&#34;Returns sql information about a table (runs PRAGMA TABLE_INFO(name))&#34;&#34;&#34;
         self.cursor.execute(f&#34;PRAGMA table_info({name});&#34;)
         return(self.cursor.fetchall())
@@ -97,7 +97,7 @@ class Database:
         self.conn.commit()
         self.conn.close()
 
-    def get_table_collums(self, name):
+    def get_table_collums(self, name: str):
         &#34;&#34;&#34;Returns the collum names for a given table&#34;&#34;&#34;
         keys = []
 
@@ -153,7 +153,7 @@ class Database:
             print(f&#34;added entry to table \&#34;{table}\&#34;: {entry}&#34;)
 
     # TODO add ability to use other field than id
-    def update_table_entry(self, table, entry, fill_null=False, silent=False): # TODO finnish this next!
+    def update_table_entry(self, table: str, entry: dict, fill_null=False, silent=False): # TODO finnish this next!
         if not &#39;id&#39; in entry:
             raise Exception(f&#34;Cannot update entry as entry has no id.&#34;)
 
@@ -186,7 +186,7 @@ class Database:
 <dl>
 <dt id="sqlite_integrated.Database"><code class="flex name class">
 <span>class <span class="ident">Database</span></span>
-<span>(</span><span>path, new=False)</span>
+<span>(</span><span>path: str, new=False)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Main database class for manipulating sqlite3 databases</p></div>
@@ -197,7 +197,7 @@ class Database:
 <pre><code class="python">class Database:
     &#34;&#34;&#34;Main database class for manipulating sqlite3 databases&#34;&#34;&#34;
 
-    def __init__(self, path, new = False):
+    def __init__(self, path: str, new = False):
         if not new and not os.path.isfile(path):
             raise(Exception(f&#34;no database file at \&#34;{path}\&#34;. If you want to create one, pass \&#34;new=True\&#34;&#34;))
 
@@ -220,18 +220,18 @@ class Database:
             names.append(name[0])
         return(names)
     
-    def is_table(self, table_name):
+    def is_table(self, table_name: str):
         &#34;&#34;&#34;Check if database has a table with a certain name&#34;&#34;&#34;
         if table_name in self.get_table_names():
             return True
         return False
 
-    def get_table_raw(self, name):
+    def get_table_raw(self, name: str):
         &#34;&#34;&#34;Returns all entries in a table as tuples&#34;&#34;&#34;
         self.cursor.execute(f&#34;SELECT * FROM {name}&#34;)
         return(self.cursor.fetchall())
 
-    def get_table(self, name):
+    def get_table(self, name: str):
         &#34;&#34;&#34;Returns all entries in a table as python dictionaries&#34;&#34;&#34;
         tuples = self.get_table_raw(name)
         fields = self.get_table_collums(name)
@@ -247,7 +247,7 @@ class Database:
         return(dict_table)
 
 
-    def get_table_info(self, name):
+    def get_table_info(self, name: str):
         &#34;&#34;&#34;Returns sql information about a table (runs PRAGMA TABLE_INFO(name))&#34;&#34;&#34;
         self.cursor.execute(f&#34;PRAGMA table_info({name});&#34;)
         return(self.cursor.fetchall())
@@ -261,7 +261,7 @@ class Database:
         self.conn.commit()
         self.conn.close()
 
-    def get_table_collums(self, name):
+    def get_table_collums(self, name: str):
         &#34;&#34;&#34;Returns the collum names for a given table&#34;&#34;&#34;
         keys = []
 
@@ -317,7 +317,7 @@ class Database:
             print(f&#34;added entry to table \&#34;{table}\&#34;: {entry}&#34;)
 
     # TODO add ability to use other field than id
-    def update_table_entry(self, table, entry, fill_null=False, silent=False): # TODO finnish this next!
+    def update_table_entry(self, table: str, entry: dict, fill_null=False, silent=False): # TODO finnish this next!
         if not &#39;id&#39; in entry:
             raise Exception(f&#34;Cannot update entry as entry has no id.&#34;)
 
@@ -428,7 +428,7 @@ class Database:
 </details>
 </dd>
 <dt id="sqlite_integrated.Database.get_table"><code class="name flex">
-<span>def <span class="ident">get_table</span></span>(<span>self, name)</span>
+<span>def <span class="ident">get_table</span></span>(<span>self, name: str)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Returns all entries in a table as python dictionaries</p></div>
@@ -436,7 +436,7 @@ class Database:
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_table(self, name):
+<pre><code class="python">def get_table(self, name: str):
     &#34;&#34;&#34;Returns all entries in a table as python dictionaries&#34;&#34;&#34;
     tuples = self.get_table_raw(name)
     fields = self.get_table_collums(name)
@@ -453,7 +453,7 @@ class Database:
 </details>
 </dd>
 <dt id="sqlite_integrated.Database.get_table_collums"><code class="name flex">
-<span>def <span class="ident">get_table_collums</span></span>(<span>self, name)</span>
+<span>def <span class="ident">get_table_collums</span></span>(<span>self, name: str)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Returns the collum names for a given table</p></div>
@@ -461,7 +461,7 @@ class Database:
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_table_collums(self, name):
+<pre><code class="python">def get_table_collums(self, name: str):
     &#34;&#34;&#34;Returns the collum names for a given table&#34;&#34;&#34;
     keys = []
 
@@ -471,7 +471,7 @@ class Database:
 </details>
 </dd>
 <dt id="sqlite_integrated.Database.get_table_info"><code class="name flex">
-<span>def <span class="ident">get_table_info</span></span>(<span>self, name)</span>
+<span>def <span class="ident">get_table_info</span></span>(<span>self, name: str)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Returns sql information about a table (runs PRAGMA TABLE_INFO(name))</p></div>
@@ -479,7 +479,7 @@ class Database:
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_table_info(self, name):
+<pre><code class="python">def get_table_info(self, name: str):
     &#34;&#34;&#34;Returns sql information about a table (runs PRAGMA TABLE_INFO(name))&#34;&#34;&#34;
     self.cursor.execute(f&#34;PRAGMA table_info({name});&#34;)
     return(self.cursor.fetchall())</code></pre>
@@ -504,7 +504,7 @@ class Database:
 </details>
 </dd>
 <dt id="sqlite_integrated.Database.get_table_raw"><code class="name flex">
-<span>def <span class="ident">get_table_raw</span></span>(<span>self, name)</span>
+<span>def <span class="ident">get_table_raw</span></span>(<span>self, name: str)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Returns all entries in a table as tuples</p></div>
@@ -512,14 +512,14 @@ class Database:
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_table_raw(self, name):
+<pre><code class="python">def get_table_raw(self, name: str):
     &#34;&#34;&#34;Returns all entries in a table as tuples&#34;&#34;&#34;
     self.cursor.execute(f&#34;SELECT * FROM {name}&#34;)
     return(self.cursor.fetchall())</code></pre>
 </details>
 </dd>
 <dt id="sqlite_integrated.Database.is_table"><code class="name flex">
-<span>def <span class="ident">is_table</span></span>(<span>self, table_name)</span>
+<span>def <span class="ident">is_table</span></span>(<span>self, table_name: str)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Check if database has a table with a certain name</p></div>
@@ -527,7 +527,7 @@ class Database:
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def is_table(self, table_name):
+<pre><code class="python">def is_table(self, table_name: str):
     &#34;&#34;&#34;Check if database has a table with a certain name&#34;&#34;&#34;
     if table_name in self.get_table_names():
         return True
@@ -549,7 +549,7 @@ class Database:
 </details>
 </dd>
 <dt id="sqlite_integrated.Database.update_table_entry"><code class="name flex">
-<span>def <span class="ident">update_table_entry</span></span>(<span>self, table, entry, fill_null=False, silent=False)</span>
+<span>def <span class="ident">update_table_entry</span></span>(<span>self, table: str, entry: dict, fill_null=False, silent=False)</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -557,7 +557,7 @@ class Database:
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def update_table_entry(self, table, entry, fill_null=False, silent=False): # TODO finnish this next!
+<pre><code class="python">def update_table_entry(self, table: str, entry: dict, fill_null=False, silent=False): # TODO finnish this next!
     if not &#39;id&#39; in entry:
         raise Exception(f&#34;Cannot update entry as entry has no id.&#34;)
 
