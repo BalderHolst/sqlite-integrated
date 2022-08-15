@@ -1,8 +1,18 @@
 import sqlite3
 import os
-
+from dataclasses import dataclass, astuple, asdict
 class DatabaseException(Exception):
     """Raised when the database fails to execute command"""
+
+class DatabaseEntry(dict):
+    """A python dictionary that keeps track of the table where it came from, and the name and value of its id field"""
+    def __init__(self, entry_dict: dict, table: str, id_field = "id"):
+        self.id_field = id_field
+        self.table= table
+        self.update(entry_dict)
+
+    def __repr__(self) -> str:
+        return f"DatabaseEntry(table: {self.table}, data: {super().__repr__()})"
 
 
 class Database:
@@ -68,7 +78,7 @@ class Database:
             entry = {}
             for i, field in enumerate(fields):
                 entry[field] = t[i]
-            dict_table.append(entry)
+            dict_table.append(DatabaseEntry(entry, name, id_field=None))
 
         return(dict_table)
 
@@ -78,8 +88,11 @@ class Database:
         self.cursor.execute(f"PRAGMA table_info({name});")
         return(self.cursor.fetchall())
 
-    def print_table(self, name: str, max_len:int = 40, get_only = None): # TODO test with more cols
-        """Print a pretty table (with a name) to the terminal"""
+    def table_overview(self, name: str, max_len:int = 40, get_only = None): # TODO test with more cols
+        """Returns a pretty table (with a name). Intended to to be run in a python shell or print with ´print´"""
+        
+        text = "" # the output text
+
         raw_table = self.get_table_raw(name, get_only=get_only)
 
         if get_only:
@@ -108,7 +121,7 @@ class Database:
                 formatted_list.append(string + " " * (longest_words[i] - len(string)))
             return(seperator.join(formatted_list))
         
-        print(formatRow(fields, longest_words))
+        text += formatRow(fields, longest_words) + "\n"
         underline = "═" * (sum(longest_words) + len(seperator))
 
         # This block is for placing the intersections
@@ -118,29 +131,28 @@ class Database:
             underline = underline[:offset +1] + "╬" + underline[offset:]
             offset += len(seperator)
 
-        print(underline)
+        text += underline + "\n"
 
         if len(raw_table) >= max_len:
             for row in raw_table[:max_len-5]:
-                print(formatRow(row, longest_words))
-            print("    .\n    .\n    .")
+                text += formatRow(row, longest_words) + "\n"
+            text += "    .\n    .\n    .\n"
             for row in raw_table[-5:]:
-                print(formatRow(row, longest_words))
+                text += formatRow(row, longest_words)
         else:
             for row in raw_table:
-                print(formatRow(row, longest_words))
+                text += formatRow(row, longest_words)
+        return(text)
 
-    def print_overview(self):
-        """Prints an overview of all the tables in the database with their fields."""
+    def overview(self):
+        """Returns an overview of all the tables in the database with their fields. Intended to to be run in a python shell or print with ´print´"""
 
-        print("Tables")
+        text = "Tables\n"
         for table_name in self.get_table_names():
-            print("\t" + table_name)
+            text += "\t" + table_name + "\n"
             for col_name in self.get_table_collums(table_name):
-                print("\t\t" + col_name)
-
-        
-
+                text += "\t\t" + col_name + "\n"
+        return(text)
 
 
     def get_table_collums(self, name: str):
@@ -198,17 +210,21 @@ class Database:
         if not silent:
             print(f"added entry to table \"{table}\": {entry}")
 
-    # TODO add ability to use other field than id
     # TODO implement fill_null
-    def update_table_entry(self, table: str, entry: dict, id_field:str = "id", fill_null=False, silent=False):
-        if not id_field in entry:
-            raise DatabaseException(f"Cannot update entry as entry has no id.")
+    def update_table_entry(self, entry: DatabaseEntry, id_field:str = None, fill_null=False, silent=False):
+        """Update entry in database with a DatabaseEntry"""
 
-        if not self.is_table(table):
-            raise DatabaseException(f"Database has no table with the name \"{table}\". Possible tablenames are: {self.get_table_names()}")
+        if id_field:
+            entry.id_field = id_field
+
+        if not entry.id_field in entry:
+            raise DatabaseException(f"Cannot update entry as entry has no id in id_field: \"{id_field}\"")
+
+        if not self.is_table(entry.table):
+            raise DatabaseException(f"Database has no table with the name \"{entry.table}\". Possible tablenames are: {self.get_table_names()}")
         
         # TODO make sure order does not matter
-        table_fields = self.get_table_collums(table)
+        table_fields = self.get_table_collums(entry.table)
         if table_fields != list(entry):
             raise DatabaseException(f"Table fields do not match entry fields: {table_fields} != {list(entry)}")
 
@@ -221,14 +237,14 @@ class Database:
                     value = f"\"{value}\""
                 data.append(f"{field} = {value}")
 
-        sql = f"UPDATE {table} SET {', '.join(data)} WHERE {id_field} = {entry[id_field]}"
+        sql = f"UPDATE {entry.table} SET {', '.join(data)} WHERE {id_field} = {entry[id_field]}"
 
         print(sql)
 
         self.cursor.execute(sql)
 
         if not silent:
-            print(f"added entry to table \"{table}\": {entry}")
+            print(f"added entry to table \"{entry.table}\": {entry}")
 
     def save(self):
         """Writes any changes to the database file"""
@@ -239,6 +255,19 @@ class Database:
         self.conn.commit()
         self.conn.close()
 
-if __name__ == "__main__":
-    Database("not/path")
+    def get_entry_by_id(self, table, ID, id_field="id"):  # TODO
+        """Get table entry by id"""
 
+        sql = f"SELECT * FROM {table} WHERE {id_field} = {ID}"
+
+        print(sql)
+
+        self.cursor.execute(sql)
+
+        print(self.cursor.fetchone())
+
+if __name__ == "__main__":
+    db = Database("testing/test.db")
+
+    entry = db.get_entry_by_id("artists", 1, id_field="ArtistId")
+    
