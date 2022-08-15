@@ -1,14 +1,23 @@
 import sqlite3
 import os
-from dataclasses import dataclass, astuple, asdict
+from dataclasses import dataclass, astuple, asdict, fields
 class DatabaseException(Exception):
     """Raised when the database fails to execute command"""
 
 class DatabaseEntry(dict):
-    """A python dictionary that keeps track of the table where it came from, and the name and value of its id field"""
-    def __init__(self, entry_dict: dict, table: str, id_field = "id"):
+    """A python dictionary that keeps track of the table where it came from, and the name and value of its id field. This class is not supposed to be created manually"""
+    def __init__(self, entry_dict: dict, table: str, id_field):
+        """"
+        Constructs the entry by saving the table and id_field as attributes. The ´entry_dict´ is used to populate this object with data.
+
+            Parameters:
+                id_field: The collum name for the entry's id
+                table:      The name of the table the entry is a part of
+                entry_dict: A dictionary containing all the information. This information can be accesed just like any other python dict with ´my_entry[my_key]´.
+        """
+
         self.id_field = id_field
-        self.table= table
+        self.table = table
         self.update(entry_dict)
 
     def __repr__(self) -> str:
@@ -16,11 +25,21 @@ class DatabaseEntry(dict):
 
 
 class Database:
-    """Main database class for manipulating sqlite3 databases"""
+    """
+    Main database class for manipulating sqlite3 databases
+
+        Parameters:
+            path:               Path to the database file
+
+        Optional
+            new:                A new blank database will be created where the ´self.path´ is pointing
+            default_id_field:   The default name for the id field in tables
+            silent:             Disables all feedback in the form of prints 
+    """
 
     # TODO add global silent variable to silence all database prints
 
-    def __init__(self, path: str, new = False):
+    def __init__(self, path: str, new = False, default_id_field="id", silent=False):
         if not new and not os.path.isfile(path):
             raise(DatabaseException(f"no database file at \"{path}\". If you want to create one, pass \"new=True\""))
 
@@ -33,9 +52,15 @@ class Database:
         self.cursor = self.conn.cursor()
         """The sqlite3 cursor"""
 
+        self.default_id_field = default_id_field #TODO
+        """The default name for the id_field in returned DatabaseEntry"""
+
+        self.silent=silent #TODO
+        """Disables all feedback in the form of prints"""
+
         self.conn.execute("PRAGMA foregin_keys = ON")
 
-    def get_table_names(self):
+    def get_table_names(self) -> list:
         """Returns the names of all tables in the database"""
         res = self.conn.execute("SELECT name FROM sqlite_master WHERE type='table';")
         names = []
@@ -43,13 +68,13 @@ class Database:
             names.append(name[0])
         return(names)
     
-    def is_table(self, table_name: str):
+    def is_table(self, table_name: str) -> bool:
         """Check if database has a table with a certain name"""
         if table_name in self.get_table_names():
             return True
         return False
 
-    def get_table_raw(self, name: str, get_only = None):
+    def get_table_raw(self, name: str, get_only = None) -> list:
         """Returns all entries in a table as tuples"""
 
         selected = "*"
@@ -63,23 +88,34 @@ class Database:
         self.cursor.execute(f"SELECT {selected} FROM {name}")
         return(self.cursor.fetchall())
 
-    def get_table(self, name: str, get_only=None):
-        """Returns all entries in a table as python dictionaries"""
+    def raw_entry_to_entry(self, raw_entry: tuple, table: str, id_field, fields=None) -> DatabaseEntry:
+        """Convert a raw entry (tuple) to a DatabaseEntry"""
+
+        if not fields:
+            fields = self.get_table_collums(table)
+        entry = {}
+        for i, field in enumerate(fields):
+            entry[field] = raw_entry[i]
+        return(DatabaseEntry(entry, table, id_field))
+
+
+    def get_table(self, name: str, get_only=None, id_field=None) -> list:
+        """Returns all entries in a table as python dictionaries. This function loops over all entries in the table, so it is not the best in big databases"""
+
+        if not id_field:
+            id_field = self.default_id_field
+
         tuples = self.get_table_raw(name, get_only)
 
+        fields = []
         if get_only:
             fields = get_only
         else:
             fields = self.get_table_collums(name)
 
         dict_table = []
-
-        for t in tuples:
-            entry = {}
-            for i, field in enumerate(fields):
-                entry[field] = t[i]
-            dict_table.append(DatabaseEntry(entry, name, id_field=None))
-
+        for raw_entry in tuples:
+            dict_table.append(self.raw_entry_to_entry(raw_entry, name, id_field, fields=fields))
         return(dict_table)
 
 
@@ -88,7 +124,7 @@ class Database:
         self.cursor.execute(f"PRAGMA table_info({name});")
         return(self.cursor.fetchall())
 
-    def table_overview(self, name: str, max_len:int = 40, get_only = None): # TODO test with more cols
+    def table_overview(self, name: str, max_len:int = 40, get_only = None):
         """Returns a pretty table (with a name). Intended to to be run in a python shell or print with ´print´"""
         
         text = "" # the output text
@@ -218,7 +254,7 @@ class Database:
             entry.id_field = id_field
 
         if not entry.id_field in entry:
-            raise DatabaseException(f"Cannot update entry as entry has no id in id_field: \"{id_field}\"")
+            raise DatabaseException(f"Cannot update entry as entry has no id in id_field: \"{entry.id_field}\"")
 
         if not self.is_table(entry.table):
             raise DatabaseException(f"Database has no table with the name \"{entry.table}\". Possible tablenames are: {self.get_table_names()}")
@@ -231,21 +267,46 @@ class Database:
         data = []
 
         for field in entry:
-            if field != id_field:
+            if field != entry.id_field:
                 value = entry[field]
                 if isinstance(value, str):
                     value = f"\"{value}\""
                 data.append(f"{field} = {value}")
 
-        sql = f"UPDATE {entry.table} SET {', '.join(data)} WHERE {id_field} = {entry[id_field]}"
-
-        print(sql)
+        sql = f"UPDATE {entry.table} SET {', '.join(data)} WHERE {entry.id_field} = {entry[entry.id_field]}"
 
         self.cursor.execute(sql)
 
-        if not silent:
-            print(f"added entry to table \"{entry.table}\": {entry}")
+        if not silent and not self.silent:
+            print(f"updated entry in table \"{entry.table}\": {entry}")
 
+
+    def get_entry_by_id(self, table, ID, id_field=None):
+        """Get table entry by id"""
+
+        if not id_field:
+            id_field = self.default_id_field
+
+        if not self.is_table(table):
+            raise DatabaseException(f"Database contains no table with the name: \"{table}\". These are the available tables: {self.get_table_names()}")
+
+        sql = f"SELECT * FROM {table} WHERE {id_field} = {ID}"
+
+        self.cursor.execute(sql)
+
+        answer = self.cursor.fetchall()
+
+        # some checks
+        if len(answer) != 1:
+            if len(answer) > 1:
+                raise DatabaseException(f"There are more than one entry in table \"{table}\" with an id field \"{id_field}\" with the value \"{id}\": {answer}")
+            elif len(answer) == 0:
+                raise DatabaseException("There is no entry in table \"{table}\" with an id_field \"{id_field}\" with a value of {ID}")
+            else:
+                raise DatabaseException("Something went very wrong, please contact the package author") # this will never be run... i think
+
+        return(self.raw_entry_to_entry(answer[0], table, id_field=id_field))
+        
     def save(self):
         """Writes any changes to the database file"""
         self.conn.commit()
@@ -254,20 +315,7 @@ class Database:
         """saves and closes the database. If you want to explicitly close without saving use: ´self.conn.close()´"""
         self.conn.commit()
         self.conn.close()
+        
 
-    def get_entry_by_id(self, table, ID, id_field="id"):  # TODO
-        """Get table entry by id"""
-
-        sql = f"SELECT * FROM {table} WHERE {id_field} = {ID}"
-
-        print(sql)
-
-        self.cursor.execute(sql)
-
-        print(self.cursor.fetchone())
-
-if __name__ == "__main__":
-    db = Database("testing/test.db")
-
-    entry = db.get_entry_by_id("artists", 1, id_field="ArtistId")
-    
+if __name__ == "__main__": # for debugging
+    db = Database("testing/test.db", default_id_field="ArtistId")

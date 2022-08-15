@@ -28,83 +28,225 @@
 </summary>
 <pre><code class="python">import sqlite3
 import os
+from dataclasses import dataclass, astuple, asdict, fields
+class DatabaseException(Exception):
+    &#34;&#34;&#34;Raised when the database fails to execute command&#34;&#34;&#34;
+
+class DatabaseEntry(dict):
+    &#34;&#34;&#34;A python dictionary that keeps track of the table where it came from, and the name and value of its id field. This class is not supposed to be created manually&#34;&#34;&#34;
+    def __init__(self, entry_dict: dict, table: str, id_field):
+        &#34;&#34;&#34;&#34;
+        Constructs the entry by saving the table and id_field as attributes. The ´entry_dict´ is used to populate this object with data.
+
+            Parameters:
+                id_field: The collum name for the entry&#39;s id
+                table:      The name of the table the entry is a part of
+                entry_dict: A dictionary containing all the information. This information can be accesed just like any other python dict with ´my_entry[my_key]´.
+        &#34;&#34;&#34;
+
+        self.id_field = id_field
+        self.table = table
+        self.update(entry_dict)
+
+    def __repr__(self) -&gt; str:
+        return f&#34;DatabaseEntry(table: {self.table}, data: {super().__repr__()})&#34;
 
 
 class Database:
-    def __init__(self, path, new = False):
+    &#34;&#34;&#34;
+    Main database class for manipulating sqlite3 databases
+
+        Parameters:
+            path:               Path to the database file
+
+        Optional
+            new:                A new blank database will be created where the ´self.path´ is pointing
+            default_id_field:   The default name for the id field in tables
+            silent:             Disables all feedback in the form of prints 
+    &#34;&#34;&#34;
+
+    # TODO add global silent variable to silence all database prints
+
+    def __init__(self, path: str, new = False, default_id_field=&#34;id&#34;, silent=False):
         if not new and not os.path.isfile(path):
-            raise(Exception(f&#34;no database file at \&#34;{path}\&#34;. If you want to create one, pass \&#34;new=True\&#34;&#34;))
+            raise(DatabaseException(f&#34;no database file at \&#34;{path}\&#34;. If you want to create one, pass \&#34;new=True\&#34;&#34;))
 
         self.path = path
+        &#34;&#34;&#34;Path to the database file&#34;&#34;&#34;
+
         self.conn = sqlite3.connect(path)
+        &#34;&#34;&#34;The sqlite3 connection&#34;&#34;&#34;
+
         self.cursor = self.conn.cursor()
+        &#34;&#34;&#34;The sqlite3 cursor&#34;&#34;&#34;
+
+        self.default_id_field = default_id_field #TODO
+        &#34;&#34;&#34;The default name for the id_field in returned DatabaseEntry&#34;&#34;&#34;
+
+        self.silent=silent #TODO
+        &#34;&#34;&#34;Disables all feedback in the form of prints&#34;&#34;&#34;
 
         self.conn.execute(&#34;PRAGMA foregin_keys = ON&#34;)
 
-    def get_table_names(self):
+    def get_table_names(self) -&gt; list:
+        &#34;&#34;&#34;Returns the names of all tables in the database&#34;&#34;&#34;
         res = self.conn.execute(&#34;SELECT name FROM sqlite_master WHERE type=&#39;table&#39;;&#34;)
         names = []
         for name in res:
             names.append(name[0])
         return(names)
     
-    def is_table(self, table_name):
+    def is_table(self, table_name: str) -&gt; bool:
+        &#34;&#34;&#34;Check if database has a table with a certain name&#34;&#34;&#34;
         if table_name in self.get_table_names():
             return True
         return False
 
-    def get_table(self, name):
-        self.cursor.execute(f&#34;SELECT * FROM {name}&#34;)
+    def get_table_raw(self, name: str, get_only = None) -&gt; list:
+        &#34;&#34;&#34;Returns all entries in a table as tuples&#34;&#34;&#34;
+
+        selected = &#34;*&#34;
+        
+        if get_only:
+            if isinstance(get_only, list):
+                selected = f&#34;[{&#39;,&#39;.join(get_only)}]&#34;
+            else:
+                raise ValueError(f&#34;get_only can either be ´None´ or ´list´. Got: {get_only}&#34;)
+        
+        self.cursor.execute(f&#34;SELECT {selected} FROM {name}&#34;)
         return(self.cursor.fetchall())
 
-    def get_table_info(self, name):
+    def raw_entry_to_entry(self, raw_entry: tuple, table: str, id_field, fields=None) -&gt; DatabaseEntry:
+        &#34;&#34;&#34;Convert a raw entry (tuple) to a DatabaseEntry&#34;&#34;&#34;
+
+        if not fields:
+            fields = self.get_table_collums(table)
+        entry = {}
+        for i, field in enumerate(fields):
+            entry[field] = raw_entry[i]
+        return(DatabaseEntry(entry, table, id_field))
+
+
+    def get_table(self, name: str, get_only=None, id_field=None) -&gt; list:
+        &#34;&#34;&#34;Returns all entries in a table as python dictionaries. This function loops over all entries in the table, so it is not the best in big databases&#34;&#34;&#34;
+
+        if not id_field:
+            id_field = self.default_id_field
+
+        tuples = self.get_table_raw(name, get_only)
+
+        fields = []
+        if get_only:
+            fields = get_only
+        else:
+            fields = self.get_table_collums(name)
+
+        dict_table = []
+        for raw_entry in tuples:
+            dict_table.append(self.raw_entry_to_entry(raw_entry, name, id_field, fields=fields))
+        return(dict_table)
+
+
+    def get_table_info(self, name: str):
+        &#34;&#34;&#34;Returns sql information about a table (runs PRAGMA TABLE_INFO(name))&#34;&#34;&#34;
         self.cursor.execute(f&#34;PRAGMA table_info({name});&#34;)
         return(self.cursor.fetchall())
 
-    def save(self):
-        self.conn.commit()
-    
-    def close(self):
-        self.conn.commit()
-        self.conn.close()
+    def table_overview(self, name: str, max_len:int = 40, get_only = None):
+        &#34;&#34;&#34;Returns a pretty table (with a name). Intended to to be run in a python shell or print with ´print´&#34;&#34;&#34;
+        
+        text = &#34;&#34; # the output text
 
-    def get_table_collums(self, name):
+        raw_table = self.get_table_raw(name, get_only=get_only)
+
+        if get_only:
+            fields = get_only
+        else:
+            fields = self.get_table_collums(name)
+
+        cols = len(fields)
+
+        longest_words = [0] * cols
+
+        words_table = raw_table + [fields]
+
+
+        for col in range(cols):
+            for entry in words_table:
+                if len(str(entry[col])) &gt; longest_words[col]:
+                    longest_words[col] = len(str(entry[col])) 
+
+        seperator = &#34; ║ &#34;
+
+        def formatRow(row, longest_words):
+            formatted_list = []
+            for i, string in enumerate(row):
+                string = str(string)
+                formatted_list.append(string + &#34; &#34; * (longest_words[i] - len(string)))
+            return(seperator.join(formatted_list))
+        
+        text += formatRow(fields, longest_words) + &#34;\n&#34;
+        underline = &#34;═&#34; * (sum(longest_words) + len(seperator))
+
+        # This block is for placing the intersections
+        offset = 0
+        for n in longest_words[:-1]: # we dont create the an intersection after the last collum
+            offset += n
+            underline = underline[:offset +1] + &#34;╬&#34; + underline[offset:]
+            offset += len(seperator)
+
+        text += underline + &#34;\n&#34;
+
+        if len(raw_table) &gt;= max_len:
+            for row in raw_table[:max_len-5]:
+                text += formatRow(row, longest_words) + &#34;\n&#34;
+            text += &#34;    .\n    .\n    .\n&#34;
+            for row in raw_table[-5:]:
+                text += formatRow(row, longest_words)
+        else:
+            for row in raw_table:
+                text += formatRow(row, longest_words)
+        return(text)
+
+    def overview(self):
+        &#34;&#34;&#34;Returns an overview of all the tables in the database with their fields. Intended to to be run in a python shell or print with ´print´&#34;&#34;&#34;
+
+        text = &#34;Tables\n&#34;
+        for table_name in self.get_table_names():
+            text += &#34;\t&#34; + table_name + &#34;\n&#34;
+            for col_name in self.get_table_collums(table_name):
+                text += &#34;\t\t&#34; + col_name + &#34;\n&#34;
+        return(text)
+
+
+    def get_table_collums(self, name: str):
+        &#34;&#34;&#34;Returns the collum names for a given table&#34;&#34;&#34;
         keys = []
 
         for info in self.get_table_info(name):
             keys.append(list(info)[1])
         return(keys)
 
-
-    def entry_to_dict(self, entry, table_name):
-        keys = self.get_table_collums(table_name)
-        res = {}
-        
-        for n, field in enumerate(list(entry)):
-            res[keys[n]] = field
-
-        return(res)
-
-
-    def add_table_entry(self, table, entry, fill_null=False, silent=False):
+    def add_table_entry(self, table, entry: dict, fill_null=False, silent=False):
+        &#34;&#34;&#34;Add an entry to the database. The entry must have values for all fields in the table. You can pass ´fill_null=True´ to fill remaining fields with None/null. Use ´silent=True´ to suppress warnings and messages.&#34;&#34;&#34;
 
         if &#39;id&#39; in entry:
-            raise Exception(f&#34;Cannot add entry with a preexisting id ({entry[&#39;id&#39;]})&#34;)
+            raise DatabaseException(f&#34;Cannot add entry with a preexisting id ({entry[&#39;id&#39;]})&#34;)
 
         if not self.is_table(table):
-            raise Exception(f&#34;Database has no table with the name \&#34;{table}\&#34;. Possible tablenames are: {self.get_table_names()}&#34;)
+            raise DatabaseException(f&#34;Database has no table with the name \&#34;{table}\&#34;. Possible tablenames are: {self.get_table_names()}&#34;)
         
-        table_fields = db.get_table_collums(table)[1:] # no id field
+        table_fields = self.get_table_collums(table)[1:] # no id field
 
         for entry_field in entry: # removes all entry fields from table_fields list
             if entry_field in table_fields:
                 table_fields.remove(entry_field)
             else:
-                raise Exception(f&#34;The table \&#34;{table}\&#34; has no field by the name of \&#34;{entry_field}\&#34;&#34;)
+                raise DatabaseException(f&#34;The table \&#34;{table}\&#34; has no field by the name of \&#34;{entry_field}\&#34;&#34;)
 
         if len(table_fields) &gt; 0: # if there are unpopulated fields
             if not fill_null:
-                raise Exception(f&#34;Missing fields to insert into \&#34;{table}\&#34; table: {table_fields}&#34;)
+                raise DatabaseException(f&#34;Missing fields to insert into \&#34;{table}\&#34; table: {table_fields}&#34;)
             for field in table_fields:
                 entry[field] = None
 
@@ -132,39 +274,79 @@ class Database:
         if not silent:
             print(f&#34;added entry to table \&#34;{table}\&#34;: {entry}&#34;)
 
-    def update_table_entry(self, table, entry, fill_null=False, silent=False): # TODO finnish this next!
-        if not &#39;id&#39; in entry:
-            raise Exception(f&#34;Cannot update entry as entry has no id.&#34;)
+    # TODO implement fill_null
+    def update_table_entry(self, entry: DatabaseEntry, id_field:str = None, fill_null=False, silent=False):
+        &#34;&#34;&#34;Update entry in database with a DatabaseEntry&#34;&#34;&#34;
+
+        if id_field:
+            entry.id_field = id_field
+
+        if not entry.id_field in entry:
+            raise DatabaseException(f&#34;Cannot update entry as entry has no id in id_field: \&#34;{entry.id_field}\&#34;&#34;)
+
+        if not self.is_table(entry.table):
+            raise DatabaseException(f&#34;Database has no table with the name \&#34;{entry.table}\&#34;. Possible tablenames are: {self.get_table_names()}&#34;)
+        
+        # TODO make sure order does not matter
+        table_fields = self.get_table_collums(entry.table)
+        if table_fields != list(entry):
+            raise DatabaseException(f&#34;Table fields do not match entry fields: {table_fields} != {list(entry)}&#34;)
+
+        data = []
+
+        for field in entry:
+            if field != entry.id_field:
+                value = entry[field]
+                if isinstance(value, str):
+                    value = f&#34;\&#34;{value}\&#34;&#34;
+                data.append(f&#34;{field} = {value}&#34;)
+
+        sql = f&#34;UPDATE {entry.table} SET {&#39;, &#39;.join(data)} WHERE {entry.id_field} = {entry[entry.id_field]}&#34;
+
+        self.cursor.execute(sql)
+
+        if not silent and not self.silent:
+            print(f&#34;updated entry in table \&#34;{entry.table}\&#34;: {entry}&#34;)
+
+
+    def get_entry_by_id(self, table, ID, id_field=None):
+        &#34;&#34;&#34;Get table entry by id&#34;&#34;&#34;
+
+        if not id_field:
+            id_field = self.default_id_field
 
         if not self.is_table(table):
-            raise Exception(f&#34;Database has no table with the name \&#34;{table}\&#34;. Possible tablenames are: {self.get_table_names()}&#34;)
+            raise DatabaseException(f&#34;Database contains no table with the name: \&#34;{table}\&#34;. These are the available tables: {self.get_table_names()}&#34;)
 
-        table_fields = db.get_table_collums(table)[1:] # no id field
+        sql = f&#34;SELECT * FROM {table} WHERE {id_field} = {ID}&#34;
 
-        for entry_field in entry: # removes all entry fields from table_fields list
-            if entry_field in table_fields:
-                table_fields.remove(entry_field)
+        self.cursor.execute(sql)
+
+        answer = self.cursor.fetchall()
+
+        # some checks
+        if len(answer) != 1:
+            if len(answer) &gt; 1:
+                raise DatabaseException(f&#34;There are more than one entry in table \&#34;{table}\&#34; with an id field \&#34;{id_field}\&#34; with the value \&#34;{id}\&#34;: {answer}&#34;)
+            elif len(answer) == 0:
+                raise DatabaseException(&#34;There is no entry in table \&#34;{table}\&#34; with an id_field \&#34;{id_field}\&#34; with a value of {ID}&#34;)
             else:
-                raise Exception(f&#34;The table \&#34;{table}\&#34; has no field by the name of \&#34;{entry_field}\&#34;&#34;)
+                raise DatabaseException(&#34;Something went very wrong, please contact the package author&#34;) # this will never be run... i think
 
-        if len(table_fields) &gt; 0: # if there are unpopulated fields
-            if not fill_null:
-                raise Exception(f&#34;Missing fields to insert into \&#34;{table}\&#34; table: {table_fields}&#34;)
-            for field in table_fields:
-                entry[field] = None
+        return(self.raw_entry_to_entry(answer[0], table, id_field=id_field))
+        
+    def save(self):
+        &#34;&#34;&#34;Writes any changes to the database file&#34;&#34;&#34;
+        self.conn.commit()
+    
+    def close(self):
+        &#34;&#34;&#34;saves and closes the database. If you want to explicitly close without saving use: ´self.conn.close()´&#34;&#34;&#34;
+        self.conn.commit()
+        self.conn.close()
+        
 
-
-
-
-            
-
-
-
-if __name__ == &#34;__main__&#34;:
-    db = Database(&#39;database/test.db&#39;)
-
-    db.add_person({&#34;name&#34;: &#34;testperson&#34;, &#34;birth&#34;: &#34;69420&#34;})
-    db.update_table_entry(&#34;people&#34;, {&#34;id&#34;: 1, &#34;name&#34;: &#34;updated!&#34;}, fill_null=True)</code></pre>
+if __name__ == &#34;__main__&#34;: # for debugging
+    db = Database(&#34;testing/test.db&#34;, default_id_field=&#34;ArtistId&#34;)</code></pre>
 </details>
 </section>
 <section>
@@ -178,89 +360,217 @@ if __name__ == &#34;__main__&#34;:
 <dl>
 <dt id="sqlite_integrated.Database"><code class="flex name class">
 <span>class <span class="ident">Database</span></span>
-<span>(</span><span>path, new=False)</span>
+<span>(</span><span>path: str, new=False, default_id_field='id', silent=False)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Main database class for manipulating sqlite3 databases</p>
+<pre><code>Parameters:
+    path:               Path to the database file
+
+Optional
+    new:                A new blank database will be created where the ´self.path´ is pointing
+    default_id_field:   The default name for the id field in tables
+    silent:             Disables all feedback in the form of prints
+</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class Database:
-    def __init__(self, path, new = False):
+    &#34;&#34;&#34;
+    Main database class for manipulating sqlite3 databases
+
+        Parameters:
+            path:               Path to the database file
+
+        Optional
+            new:                A new blank database will be created where the ´self.path´ is pointing
+            default_id_field:   The default name for the id field in tables
+            silent:             Disables all feedback in the form of prints 
+    &#34;&#34;&#34;
+
+    # TODO add global silent variable to silence all database prints
+
+    def __init__(self, path: str, new = False, default_id_field=&#34;id&#34;, silent=False):
         if not new and not os.path.isfile(path):
-            raise(Exception(f&#34;no database file at \&#34;{path}\&#34;. If you want to create one, pass \&#34;new=True\&#34;&#34;))
+            raise(DatabaseException(f&#34;no database file at \&#34;{path}\&#34;. If you want to create one, pass \&#34;new=True\&#34;&#34;))
 
         self.path = path
+        &#34;&#34;&#34;Path to the database file&#34;&#34;&#34;
+
         self.conn = sqlite3.connect(path)
+        &#34;&#34;&#34;The sqlite3 connection&#34;&#34;&#34;
+
         self.cursor = self.conn.cursor()
+        &#34;&#34;&#34;The sqlite3 cursor&#34;&#34;&#34;
+
+        self.default_id_field = default_id_field #TODO
+        &#34;&#34;&#34;The default name for the id_field in returned DatabaseEntry&#34;&#34;&#34;
+
+        self.silent=silent #TODO
+        &#34;&#34;&#34;Disables all feedback in the form of prints&#34;&#34;&#34;
 
         self.conn.execute(&#34;PRAGMA foregin_keys = ON&#34;)
 
-    def get_table_names(self):
+    def get_table_names(self) -&gt; list:
+        &#34;&#34;&#34;Returns the names of all tables in the database&#34;&#34;&#34;
         res = self.conn.execute(&#34;SELECT name FROM sqlite_master WHERE type=&#39;table&#39;;&#34;)
         names = []
         for name in res:
             names.append(name[0])
         return(names)
     
-    def is_table(self, table_name):
+    def is_table(self, table_name: str) -&gt; bool:
+        &#34;&#34;&#34;Check if database has a table with a certain name&#34;&#34;&#34;
         if table_name in self.get_table_names():
             return True
         return False
 
-    def get_table(self, name):
-        self.cursor.execute(f&#34;SELECT * FROM {name}&#34;)
+    def get_table_raw(self, name: str, get_only = None) -&gt; list:
+        &#34;&#34;&#34;Returns all entries in a table as tuples&#34;&#34;&#34;
+
+        selected = &#34;*&#34;
+        
+        if get_only:
+            if isinstance(get_only, list):
+                selected = f&#34;[{&#39;,&#39;.join(get_only)}]&#34;
+            else:
+                raise ValueError(f&#34;get_only can either be ´None´ or ´list´. Got: {get_only}&#34;)
+        
+        self.cursor.execute(f&#34;SELECT {selected} FROM {name}&#34;)
         return(self.cursor.fetchall())
 
-    def get_table_info(self, name):
+    def raw_entry_to_entry(self, raw_entry: tuple, table: str, id_field, fields=None) -&gt; DatabaseEntry:
+        &#34;&#34;&#34;Convert a raw entry (tuple) to a DatabaseEntry&#34;&#34;&#34;
+
+        if not fields:
+            fields = self.get_table_collums(table)
+        entry = {}
+        for i, field in enumerate(fields):
+            entry[field] = raw_entry[i]
+        return(DatabaseEntry(entry, table, id_field))
+
+
+    def get_table(self, name: str, get_only=None, id_field=None) -&gt; list:
+        &#34;&#34;&#34;Returns all entries in a table as python dictionaries. This function loops over all entries in the table, so it is not the best in big databases&#34;&#34;&#34;
+
+        if not id_field:
+            id_field = self.default_id_field
+
+        tuples = self.get_table_raw(name, get_only)
+
+        fields = []
+        if get_only:
+            fields = get_only
+        else:
+            fields = self.get_table_collums(name)
+
+        dict_table = []
+        for raw_entry in tuples:
+            dict_table.append(self.raw_entry_to_entry(raw_entry, name, id_field, fields=fields))
+        return(dict_table)
+
+
+    def get_table_info(self, name: str):
+        &#34;&#34;&#34;Returns sql information about a table (runs PRAGMA TABLE_INFO(name))&#34;&#34;&#34;
         self.cursor.execute(f&#34;PRAGMA table_info({name});&#34;)
         return(self.cursor.fetchall())
 
-    def save(self):
-        self.conn.commit()
-    
-    def close(self):
-        self.conn.commit()
-        self.conn.close()
+    def table_overview(self, name: str, max_len:int = 40, get_only = None):
+        &#34;&#34;&#34;Returns a pretty table (with a name). Intended to to be run in a python shell or print with ´print´&#34;&#34;&#34;
+        
+        text = &#34;&#34; # the output text
 
-    def get_table_collums(self, name):
+        raw_table = self.get_table_raw(name, get_only=get_only)
+
+        if get_only:
+            fields = get_only
+        else:
+            fields = self.get_table_collums(name)
+
+        cols = len(fields)
+
+        longest_words = [0] * cols
+
+        words_table = raw_table + [fields]
+
+
+        for col in range(cols):
+            for entry in words_table:
+                if len(str(entry[col])) &gt; longest_words[col]:
+                    longest_words[col] = len(str(entry[col])) 
+
+        seperator = &#34; ║ &#34;
+
+        def formatRow(row, longest_words):
+            formatted_list = []
+            for i, string in enumerate(row):
+                string = str(string)
+                formatted_list.append(string + &#34; &#34; * (longest_words[i] - len(string)))
+            return(seperator.join(formatted_list))
+        
+        text += formatRow(fields, longest_words) + &#34;\n&#34;
+        underline = &#34;═&#34; * (sum(longest_words) + len(seperator))
+
+        # This block is for placing the intersections
+        offset = 0
+        for n in longest_words[:-1]: # we dont create the an intersection after the last collum
+            offset += n
+            underline = underline[:offset +1] + &#34;╬&#34; + underline[offset:]
+            offset += len(seperator)
+
+        text += underline + &#34;\n&#34;
+
+        if len(raw_table) &gt;= max_len:
+            for row in raw_table[:max_len-5]:
+                text += formatRow(row, longest_words) + &#34;\n&#34;
+            text += &#34;    .\n    .\n    .\n&#34;
+            for row in raw_table[-5:]:
+                text += formatRow(row, longest_words)
+        else:
+            for row in raw_table:
+                text += formatRow(row, longest_words)
+        return(text)
+
+    def overview(self):
+        &#34;&#34;&#34;Returns an overview of all the tables in the database with their fields. Intended to to be run in a python shell or print with ´print´&#34;&#34;&#34;
+
+        text = &#34;Tables\n&#34;
+        for table_name in self.get_table_names():
+            text += &#34;\t&#34; + table_name + &#34;\n&#34;
+            for col_name in self.get_table_collums(table_name):
+                text += &#34;\t\t&#34; + col_name + &#34;\n&#34;
+        return(text)
+
+
+    def get_table_collums(self, name: str):
+        &#34;&#34;&#34;Returns the collum names for a given table&#34;&#34;&#34;
         keys = []
 
         for info in self.get_table_info(name):
             keys.append(list(info)[1])
         return(keys)
 
-
-    def entry_to_dict(self, entry, table_name):
-        keys = self.get_table_collums(table_name)
-        res = {}
-        
-        for n, field in enumerate(list(entry)):
-            res[keys[n]] = field
-
-        return(res)
-
-
-    def add_table_entry(self, table, entry, fill_null=False, silent=False):
+    def add_table_entry(self, table, entry: dict, fill_null=False, silent=False):
+        &#34;&#34;&#34;Add an entry to the database. The entry must have values for all fields in the table. You can pass ´fill_null=True´ to fill remaining fields with None/null. Use ´silent=True´ to suppress warnings and messages.&#34;&#34;&#34;
 
         if &#39;id&#39; in entry:
-            raise Exception(f&#34;Cannot add entry with a preexisting id ({entry[&#39;id&#39;]})&#34;)
+            raise DatabaseException(f&#34;Cannot add entry with a preexisting id ({entry[&#39;id&#39;]})&#34;)
 
         if not self.is_table(table):
-            raise Exception(f&#34;Database has no table with the name \&#34;{table}\&#34;. Possible tablenames are: {self.get_table_names()}&#34;)
+            raise DatabaseException(f&#34;Database has no table with the name \&#34;{table}\&#34;. Possible tablenames are: {self.get_table_names()}&#34;)
         
-        table_fields = db.get_table_collums(table)[1:] # no id field
+        table_fields = self.get_table_collums(table)[1:] # no id field
 
         for entry_field in entry: # removes all entry fields from table_fields list
             if entry_field in table_fields:
                 table_fields.remove(entry_field)
             else:
-                raise Exception(f&#34;The table \&#34;{table}\&#34; has no field by the name of \&#34;{entry_field}\&#34;&#34;)
+                raise DatabaseException(f&#34;The table \&#34;{table}\&#34; has no field by the name of \&#34;{entry_field}\&#34;&#34;)
 
         if len(table_fields) &gt; 0: # if there are unpopulated fields
             if not fill_null:
-                raise Exception(f&#34;Missing fields to insert into \&#34;{table}\&#34; table: {table_fields}&#34;)
+                raise DatabaseException(f&#34;Missing fields to insert into \&#34;{table}\&#34; table: {table_fields}&#34;)
             for field in table_fields:
                 entry[field] = None
 
@@ -288,57 +598,130 @@ if __name__ == &#34;__main__&#34;:
         if not silent:
             print(f&#34;added entry to table \&#34;{table}\&#34;: {entry}&#34;)
 
-    def update_table_entry(self, table, entry, fill_null=False, silent=False): # TODO finnish this next!
-        if not &#39;id&#39; in entry:
-            raise Exception(f&#34;Cannot update entry as entry has no id.&#34;)
+    # TODO implement fill_null
+    def update_table_entry(self, entry: DatabaseEntry, id_field:str = None, fill_null=False, silent=False):
+        &#34;&#34;&#34;Update entry in database with a DatabaseEntry&#34;&#34;&#34;
+
+        if id_field:
+            entry.id_field = id_field
+
+        if not entry.id_field in entry:
+            raise DatabaseException(f&#34;Cannot update entry as entry has no id in id_field: \&#34;{entry.id_field}\&#34;&#34;)
+
+        if not self.is_table(entry.table):
+            raise DatabaseException(f&#34;Database has no table with the name \&#34;{entry.table}\&#34;. Possible tablenames are: {self.get_table_names()}&#34;)
+        
+        # TODO make sure order does not matter
+        table_fields = self.get_table_collums(entry.table)
+        if table_fields != list(entry):
+            raise DatabaseException(f&#34;Table fields do not match entry fields: {table_fields} != {list(entry)}&#34;)
+
+        data = []
+
+        for field in entry:
+            if field != entry.id_field:
+                value = entry[field]
+                if isinstance(value, str):
+                    value = f&#34;\&#34;{value}\&#34;&#34;
+                data.append(f&#34;{field} = {value}&#34;)
+
+        sql = f&#34;UPDATE {entry.table} SET {&#39;, &#39;.join(data)} WHERE {entry.id_field} = {entry[entry.id_field]}&#34;
+
+        self.cursor.execute(sql)
+
+        if not silent and not self.silent:
+            print(f&#34;updated entry in table \&#34;{entry.table}\&#34;: {entry}&#34;)
+
+
+    def get_entry_by_id(self, table, ID, id_field=None):
+        &#34;&#34;&#34;Get table entry by id&#34;&#34;&#34;
+
+        if not id_field:
+            id_field = self.default_id_field
 
         if not self.is_table(table):
-            raise Exception(f&#34;Database has no table with the name \&#34;{table}\&#34;. Possible tablenames are: {self.get_table_names()}&#34;)
+            raise DatabaseException(f&#34;Database contains no table with the name: \&#34;{table}\&#34;. These are the available tables: {self.get_table_names()}&#34;)
 
-        table_fields = db.get_table_collums(table)[1:] # no id field
+        sql = f&#34;SELECT * FROM {table} WHERE {id_field} = {ID}&#34;
 
-        for entry_field in entry: # removes all entry fields from table_fields list
-            if entry_field in table_fields:
-                table_fields.remove(entry_field)
+        self.cursor.execute(sql)
+
+        answer = self.cursor.fetchall()
+
+        # some checks
+        if len(answer) != 1:
+            if len(answer) &gt; 1:
+                raise DatabaseException(f&#34;There are more than one entry in table \&#34;{table}\&#34; with an id field \&#34;{id_field}\&#34; with the value \&#34;{id}\&#34;: {answer}&#34;)
+            elif len(answer) == 0:
+                raise DatabaseException(&#34;There is no entry in table \&#34;{table}\&#34; with an id_field \&#34;{id_field}\&#34; with a value of {ID}&#34;)
             else:
-                raise Exception(f&#34;The table \&#34;{table}\&#34; has no field by the name of \&#34;{entry_field}\&#34;&#34;)
+                raise DatabaseException(&#34;Something went very wrong, please contact the package author&#34;) # this will never be run... i think
 
-        if len(table_fields) &gt; 0: # if there are unpopulated fields
-            if not fill_null:
-                raise Exception(f&#34;Missing fields to insert into \&#34;{table}\&#34; table: {table_fields}&#34;)
-            for field in table_fields:
-                entry[field] = None</code></pre>
+        return(self.raw_entry_to_entry(answer[0], table, id_field=id_field))
+        
+    def save(self):
+        &#34;&#34;&#34;Writes any changes to the database file&#34;&#34;&#34;
+        self.conn.commit()
+    
+    def close(self):
+        &#34;&#34;&#34;saves and closes the database. If you want to explicitly close without saving use: ´self.conn.close()´&#34;&#34;&#34;
+        self.conn.commit()
+        self.conn.close()</code></pre>
 </details>
+<h3>Instance variables</h3>
+<dl>
+<dt id="sqlite_integrated.Database.conn"><code class="name">var <span class="ident">conn</span></code></dt>
+<dd>
+<div class="desc"><p>The sqlite3 connection</p></div>
+</dd>
+<dt id="sqlite_integrated.Database.cursor"><code class="name">var <span class="ident">cursor</span></code></dt>
+<dd>
+<div class="desc"><p>The sqlite3 cursor</p></div>
+</dd>
+<dt id="sqlite_integrated.Database.default_id_field"><code class="name">var <span class="ident">default_id_field</span></code></dt>
+<dd>
+<div class="desc"><p>The default name for the id_field in returned DatabaseEntry</p></div>
+</dd>
+<dt id="sqlite_integrated.Database.path"><code class="name">var <span class="ident">path</span></code></dt>
+<dd>
+<div class="desc"><p>Path to the database file</p></div>
+</dd>
+<dt id="sqlite_integrated.Database.silent"><code class="name">var <span class="ident">silent</span></code></dt>
+<dd>
+<div class="desc"><p>Disables all feedback in the form of prints</p></div>
+</dd>
+</dl>
 <h3>Methods</h3>
 <dl>
 <dt id="sqlite_integrated.Database.add_table_entry"><code class="name flex">
-<span>def <span class="ident">add_table_entry</span></span>(<span>self, table, entry, fill_null=False, silent=False)</span>
+<span>def <span class="ident">add_table_entry</span></span>(<span>self, table, entry: dict, fill_null=False, silent=False)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Add an entry to the database. The entry must have values for all fields in the table. You can pass ´fill_null=True´ to fill remaining fields with None/null. Use ´silent=True´ to suppress warnings and messages.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def add_table_entry(self, table, entry, fill_null=False, silent=False):
+<pre><code class="python">def add_table_entry(self, table, entry: dict, fill_null=False, silent=False):
+    &#34;&#34;&#34;Add an entry to the database. The entry must have values for all fields in the table. You can pass ´fill_null=True´ to fill remaining fields with None/null. Use ´silent=True´ to suppress warnings and messages.&#34;&#34;&#34;
 
     if &#39;id&#39; in entry:
-        raise Exception(f&#34;Cannot add entry with a preexisting id ({entry[&#39;id&#39;]})&#34;)
+        raise DatabaseException(f&#34;Cannot add entry with a preexisting id ({entry[&#39;id&#39;]})&#34;)
 
     if not self.is_table(table):
-        raise Exception(f&#34;Database has no table with the name \&#34;{table}\&#34;. Possible tablenames are: {self.get_table_names()}&#34;)
+        raise DatabaseException(f&#34;Database has no table with the name \&#34;{table}\&#34;. Possible tablenames are: {self.get_table_names()}&#34;)
     
-    table_fields = db.get_table_collums(table)[1:] # no id field
+    table_fields = self.get_table_collums(table)[1:] # no id field
 
     for entry_field in entry: # removes all entry fields from table_fields list
         if entry_field in table_fields:
             table_fields.remove(entry_field)
         else:
-            raise Exception(f&#34;The table \&#34;{table}\&#34; has no field by the name of \&#34;{entry_field}\&#34;&#34;)
+            raise DatabaseException(f&#34;The table \&#34;{table}\&#34; has no field by the name of \&#34;{entry_field}\&#34;&#34;)
 
     if len(table_fields) &gt; 0: # if there are unpopulated fields
         if not fill_null:
-            raise Exception(f&#34;Missing fields to insert into \&#34;{table}\&#34; table: {table_fields}&#34;)
+            raise DatabaseException(f&#34;Missing fields to insert into \&#34;{table}\&#34; table: {table_fields}&#34;)
         for field in table_fields:
             entry[field] = None
 
@@ -371,59 +754,93 @@ if __name__ == &#34;__main__&#34;:
 <span>def <span class="ident">close</span></span>(<span>self)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>saves and closes the database. If you want to explicitly close without saving use: ´self.conn.close()´</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def close(self):
+    &#34;&#34;&#34;saves and closes the database. If you want to explicitly close without saving use: ´self.conn.close()´&#34;&#34;&#34;
     self.conn.commit()
     self.conn.close()</code></pre>
 </details>
 </dd>
-<dt id="sqlite_integrated.Database.entry_to_dict"><code class="name flex">
-<span>def <span class="ident">entry_to_dict</span></span>(<span>self, entry, table_name)</span>
+<dt id="sqlite_integrated.Database.get_entry_by_id"><code class="name flex">
+<span>def <span class="ident">get_entry_by_id</span></span>(<span>self, table, ID, id_field=None)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Get table entry by id</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def entry_to_dict(self, entry, table_name):
-    keys = self.get_table_collums(table_name)
-    res = {}
-    
-    for n, field in enumerate(list(entry)):
-        res[keys[n]] = field
+<pre><code class="python">def get_entry_by_id(self, table, ID, id_field=None):
+    &#34;&#34;&#34;Get table entry by id&#34;&#34;&#34;
 
-    return(res)</code></pre>
+    if not id_field:
+        id_field = self.default_id_field
+
+    if not self.is_table(table):
+        raise DatabaseException(f&#34;Database contains no table with the name: \&#34;{table}\&#34;. These are the available tables: {self.get_table_names()}&#34;)
+
+    sql = f&#34;SELECT * FROM {table} WHERE {id_field} = {ID}&#34;
+
+    self.cursor.execute(sql)
+
+    answer = self.cursor.fetchall()
+
+    # some checks
+    if len(answer) != 1:
+        if len(answer) &gt; 1:
+            raise DatabaseException(f&#34;There are more than one entry in table \&#34;{table}\&#34; with an id field \&#34;{id_field}\&#34; with the value \&#34;{id}\&#34;: {answer}&#34;)
+        elif len(answer) == 0:
+            raise DatabaseException(&#34;There is no entry in table \&#34;{table}\&#34; with an id_field \&#34;{id_field}\&#34; with a value of {ID}&#34;)
+        else:
+            raise DatabaseException(&#34;Something went very wrong, please contact the package author&#34;) # this will never be run... i think
+
+    return(self.raw_entry_to_entry(answer[0], table, id_field=id_field))</code></pre>
 </details>
 </dd>
 <dt id="sqlite_integrated.Database.get_table"><code class="name flex">
-<span>def <span class="ident">get_table</span></span>(<span>self, name)</span>
+<span>def <span class="ident">get_table</span></span>(<span>self, name: str, get_only=None, id_field=None) ‑> list</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Returns all entries in a table as python dictionaries. This function loops over all entries in the table, so it is not the best in big databases</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_table(self, name):
-    self.cursor.execute(f&#34;SELECT * FROM {name}&#34;)
-    return(self.cursor.fetchall())</code></pre>
+<pre><code class="python">def get_table(self, name: str, get_only=None, id_field=None) -&gt; list:
+    &#34;&#34;&#34;Returns all entries in a table as python dictionaries. This function loops over all entries in the table, so it is not the best in big databases&#34;&#34;&#34;
+
+    if not id_field:
+        id_field = self.default_id_field
+
+    tuples = self.get_table_raw(name, get_only)
+
+    fields = []
+    if get_only:
+        fields = get_only
+    else:
+        fields = self.get_table_collums(name)
+
+    dict_table = []
+    for raw_entry in tuples:
+        dict_table.append(self.raw_entry_to_entry(raw_entry, name, id_field, fields=fields))
+    return(dict_table)</code></pre>
 </details>
 </dd>
 <dt id="sqlite_integrated.Database.get_table_collums"><code class="name flex">
-<span>def <span class="ident">get_table_collums</span></span>(<span>self, name)</span>
+<span>def <span class="ident">get_table_collums</span></span>(<span>self, name: str)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Returns the collum names for a given table</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_table_collums(self, name):
+<pre><code class="python">def get_table_collums(self, name: str):
+    &#34;&#34;&#34;Returns the collum names for a given table&#34;&#34;&#34;
     keys = []
 
     for info in self.get_table_info(name):
@@ -432,29 +849,31 @@ if __name__ == &#34;__main__&#34;:
 </details>
 </dd>
 <dt id="sqlite_integrated.Database.get_table_info"><code class="name flex">
-<span>def <span class="ident">get_table_info</span></span>(<span>self, name)</span>
+<span>def <span class="ident">get_table_info</span></span>(<span>self, name: str)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Returns sql information about a table (runs PRAGMA TABLE_INFO(name))</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_table_info(self, name):
+<pre><code class="python">def get_table_info(self, name: str):
+    &#34;&#34;&#34;Returns sql information about a table (runs PRAGMA TABLE_INFO(name))&#34;&#34;&#34;
     self.cursor.execute(f&#34;PRAGMA table_info({name});&#34;)
     return(self.cursor.fetchall())</code></pre>
 </details>
 </dd>
 <dt id="sqlite_integrated.Database.get_table_names"><code class="name flex">
-<span>def <span class="ident">get_table_names</span></span>(<span>self)</span>
+<span>def <span class="ident">get_table_names</span></span>(<span>self) ‑> list</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Returns the names of all tables in the database</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_table_names(self):
+<pre><code class="python">def get_table_names(self) -&gt; list:
+    &#34;&#34;&#34;Returns the names of all tables in the database&#34;&#34;&#34;
     res = self.conn.execute(&#34;SELECT name FROM sqlite_master WHERE type=&#39;table&#39;;&#34;)
     names = []
     for name in res:
@@ -462,66 +881,270 @@ if __name__ == &#34;__main__&#34;:
     return(names)</code></pre>
 </details>
 </dd>
-<dt id="sqlite_integrated.Database.is_table"><code class="name flex">
-<span>def <span class="ident">is_table</span></span>(<span>self, table_name)</span>
+<dt id="sqlite_integrated.Database.get_table_raw"><code class="name flex">
+<span>def <span class="ident">get_table_raw</span></span>(<span>self, name: str, get_only=None) ‑> list</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Returns all entries in a table as tuples</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def is_table(self, table_name):
+<pre><code class="python">def get_table_raw(self, name: str, get_only = None) -&gt; list:
+    &#34;&#34;&#34;Returns all entries in a table as tuples&#34;&#34;&#34;
+
+    selected = &#34;*&#34;
+    
+    if get_only:
+        if isinstance(get_only, list):
+            selected = f&#34;[{&#39;,&#39;.join(get_only)}]&#34;
+        else:
+            raise ValueError(f&#34;get_only can either be ´None´ or ´list´. Got: {get_only}&#34;)
+    
+    self.cursor.execute(f&#34;SELECT {selected} FROM {name}&#34;)
+    return(self.cursor.fetchall())</code></pre>
+</details>
+</dd>
+<dt id="sqlite_integrated.Database.is_table"><code class="name flex">
+<span>def <span class="ident">is_table</span></span>(<span>self, table_name: str) ‑> bool</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Check if database has a table with a certain name</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def is_table(self, table_name: str) -&gt; bool:
+    &#34;&#34;&#34;Check if database has a table with a certain name&#34;&#34;&#34;
     if table_name in self.get_table_names():
         return True
     return False</code></pre>
+</details>
+</dd>
+<dt id="sqlite_integrated.Database.overview"><code class="name flex">
+<span>def <span class="ident">overview</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Returns an overview of all the tables in the database with their fields. Intended to to be run in a python shell or print with ´print´</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def overview(self):
+    &#34;&#34;&#34;Returns an overview of all the tables in the database with their fields. Intended to to be run in a python shell or print with ´print´&#34;&#34;&#34;
+
+    text = &#34;Tables\n&#34;
+    for table_name in self.get_table_names():
+        text += &#34;\t&#34; + table_name + &#34;\n&#34;
+        for col_name in self.get_table_collums(table_name):
+            text += &#34;\t\t&#34; + col_name + &#34;\n&#34;
+    return(text)</code></pre>
+</details>
+</dd>
+<dt id="sqlite_integrated.Database.raw_entry_to_entry"><code class="name flex">
+<span>def <span class="ident">raw_entry_to_entry</span></span>(<span>self, raw_entry: tuple, table: str, id_field, fields=None) ‑> <a title="sqlite_integrated.DatabaseEntry" href="#sqlite_integrated.DatabaseEntry">DatabaseEntry</a></span>
+</code></dt>
+<dd>
+<div class="desc"><p>Convert a raw entry (tuple) to a DatabaseEntry</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def raw_entry_to_entry(self, raw_entry: tuple, table: str, id_field, fields=None) -&gt; DatabaseEntry:
+    &#34;&#34;&#34;Convert a raw entry (tuple) to a DatabaseEntry&#34;&#34;&#34;
+
+    if not fields:
+        fields = self.get_table_collums(table)
+    entry = {}
+    for i, field in enumerate(fields):
+        entry[field] = raw_entry[i]
+    return(DatabaseEntry(entry, table, id_field))</code></pre>
 </details>
 </dd>
 <dt id="sqlite_integrated.Database.save"><code class="name flex">
 <span>def <span class="ident">save</span></span>(<span>self)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Writes any changes to the database file</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def save(self):
+    &#34;&#34;&#34;Writes any changes to the database file&#34;&#34;&#34;
     self.conn.commit()</code></pre>
 </details>
 </dd>
-<dt id="sqlite_integrated.Database.update_table_entry"><code class="name flex">
-<span>def <span class="ident">update_table_entry</span></span>(<span>self, table, entry, fill_null=False, silent=False)</span>
+<dt id="sqlite_integrated.Database.table_overview"><code class="name flex">
+<span>def <span class="ident">table_overview</span></span>(<span>self, name: str, max_len: int = 40, get_only=None)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Returns a pretty table (with a name). Intended to to be run in a python shell or print with ´print´</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def update_table_entry(self, table, entry, fill_null=False, silent=False): # TODO finnish this next!
-    if not &#39;id&#39; in entry:
-        raise Exception(f&#34;Cannot update entry as entry has no id.&#34;)
+<pre><code class="python">def table_overview(self, name: str, max_len:int = 40, get_only = None):
+    &#34;&#34;&#34;Returns a pretty table (with a name). Intended to to be run in a python shell or print with ´print´&#34;&#34;&#34;
+    
+    text = &#34;&#34; # the output text
 
-    if not self.is_table(table):
-        raise Exception(f&#34;Database has no table with the name \&#34;{table}\&#34;. Possible tablenames are: {self.get_table_names()}&#34;)
+    raw_table = self.get_table_raw(name, get_only=get_only)
 
-    table_fields = db.get_table_collums(table)[1:] # no id field
+    if get_only:
+        fields = get_only
+    else:
+        fields = self.get_table_collums(name)
 
-    for entry_field in entry: # removes all entry fields from table_fields list
-        if entry_field in table_fields:
-            table_fields.remove(entry_field)
-        else:
-            raise Exception(f&#34;The table \&#34;{table}\&#34; has no field by the name of \&#34;{entry_field}\&#34;&#34;)
+    cols = len(fields)
 
-    if len(table_fields) &gt; 0: # if there are unpopulated fields
-        if not fill_null:
-            raise Exception(f&#34;Missing fields to insert into \&#34;{table}\&#34; table: {table_fields}&#34;)
-        for field in table_fields:
-            entry[field] = None</code></pre>
+    longest_words = [0] * cols
+
+    words_table = raw_table + [fields]
+
+
+    for col in range(cols):
+        for entry in words_table:
+            if len(str(entry[col])) &gt; longest_words[col]:
+                longest_words[col] = len(str(entry[col])) 
+
+    seperator = &#34; ║ &#34;
+
+    def formatRow(row, longest_words):
+        formatted_list = []
+        for i, string in enumerate(row):
+            string = str(string)
+            formatted_list.append(string + &#34; &#34; * (longest_words[i] - len(string)))
+        return(seperator.join(formatted_list))
+    
+    text += formatRow(fields, longest_words) + &#34;\n&#34;
+    underline = &#34;═&#34; * (sum(longest_words) + len(seperator))
+
+    # This block is for placing the intersections
+    offset = 0
+    for n in longest_words[:-1]: # we dont create the an intersection after the last collum
+        offset += n
+        underline = underline[:offset +1] + &#34;╬&#34; + underline[offset:]
+        offset += len(seperator)
+
+    text += underline + &#34;\n&#34;
+
+    if len(raw_table) &gt;= max_len:
+        for row in raw_table[:max_len-5]:
+            text += formatRow(row, longest_words) + &#34;\n&#34;
+        text += &#34;    .\n    .\n    .\n&#34;
+        for row in raw_table[-5:]:
+            text += formatRow(row, longest_words)
+    else:
+        for row in raw_table:
+            text += formatRow(row, longest_words)
+    return(text)</code></pre>
+</details>
+</dd>
+<dt id="sqlite_integrated.Database.update_table_entry"><code class="name flex">
+<span>def <span class="ident">update_table_entry</span></span>(<span>self, entry: <a title="sqlite_integrated.DatabaseEntry" href="#sqlite_integrated.DatabaseEntry">DatabaseEntry</a>, id_field: str = None, fill_null=False, silent=False)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Update entry in database with a DatabaseEntry</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def update_table_entry(self, entry: DatabaseEntry, id_field:str = None, fill_null=False, silent=False):
+    &#34;&#34;&#34;Update entry in database with a DatabaseEntry&#34;&#34;&#34;
+
+    if id_field:
+        entry.id_field = id_field
+
+    if not entry.id_field in entry:
+        raise DatabaseException(f&#34;Cannot update entry as entry has no id in id_field: \&#34;{entry.id_field}\&#34;&#34;)
+
+    if not self.is_table(entry.table):
+        raise DatabaseException(f&#34;Database has no table with the name \&#34;{entry.table}\&#34;. Possible tablenames are: {self.get_table_names()}&#34;)
+    
+    # TODO make sure order does not matter
+    table_fields = self.get_table_collums(entry.table)
+    if table_fields != list(entry):
+        raise DatabaseException(f&#34;Table fields do not match entry fields: {table_fields} != {list(entry)}&#34;)
+
+    data = []
+
+    for field in entry:
+        if field != entry.id_field:
+            value = entry[field]
+            if isinstance(value, str):
+                value = f&#34;\&#34;{value}\&#34;&#34;
+            data.append(f&#34;{field} = {value}&#34;)
+
+    sql = f&#34;UPDATE {entry.table} SET {&#39;, &#39;.join(data)} WHERE {entry.id_field} = {entry[entry.id_field]}&#34;
+
+    self.cursor.execute(sql)
+
+    if not silent and not self.silent:
+        print(f&#34;updated entry in table \&#34;{entry.table}\&#34;: {entry}&#34;)</code></pre>
 </details>
 </dd>
 </dl>
+</dd>
+<dt id="sqlite_integrated.DatabaseEntry"><code class="flex name class">
+<span>class <span class="ident">DatabaseEntry</span></span>
+<span>(</span><span>entry_dict: dict, table: str, id_field)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>A python dictionary that keeps track of the table where it came from, and the name and value of its id field. This class is not supposed to be created manually</p>
+<p>"
+Constructs the entry by saving the table and id_field as attributes. The ´entry_dict´ is used to populate this object with data.</p>
+<pre><code>Parameters:
+    id_field: The collum name for the entry's id
+    table:      The name of the table the entry is a part of
+    entry_dict: A dictionary containing all the information. This information can be accesed just like any other python dict with ´my_entry[my_key]´.
+</code></pre></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class DatabaseEntry(dict):
+    &#34;&#34;&#34;A python dictionary that keeps track of the table where it came from, and the name and value of its id field. This class is not supposed to be created manually&#34;&#34;&#34;
+    def __init__(self, entry_dict: dict, table: str, id_field):
+        &#34;&#34;&#34;&#34;
+        Constructs the entry by saving the table and id_field as attributes. The ´entry_dict´ is used to populate this object with data.
+
+            Parameters:
+                id_field: The collum name for the entry&#39;s id
+                table:      The name of the table the entry is a part of
+                entry_dict: A dictionary containing all the information. This information can be accesed just like any other python dict with ´my_entry[my_key]´.
+        &#34;&#34;&#34;
+
+        self.id_field = id_field
+        self.table = table
+        self.update(entry_dict)
+
+    def __repr__(self) -&gt; str:
+        return f&#34;DatabaseEntry(table: {self.table}, data: {super().__repr__()})&#34;</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.dict</li>
+</ul>
+</dd>
+<dt id="sqlite_integrated.DatabaseException"><code class="flex name class">
+<span>class <span class="ident">DatabaseException</span></span>
+<span>(</span><span>*args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Raised when the database fails to execute command</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class DatabaseException(Exception):
+    &#34;&#34;&#34;Raised when the database fails to execute command&#34;&#34;&#34;</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
+</ul>
 </dd>
 </dl>
 </section>
@@ -539,15 +1162,30 @@ if __name__ == &#34;__main__&#34;:
 <ul class="two-column">
 <li><code><a title="sqlite_integrated.Database.add_table_entry" href="#sqlite_integrated.Database.add_table_entry">add_table_entry</a></code></li>
 <li><code><a title="sqlite_integrated.Database.close" href="#sqlite_integrated.Database.close">close</a></code></li>
-<li><code><a title="sqlite_integrated.Database.entry_to_dict" href="#sqlite_integrated.Database.entry_to_dict">entry_to_dict</a></code></li>
+<li><code><a title="sqlite_integrated.Database.conn" href="#sqlite_integrated.Database.conn">conn</a></code></li>
+<li><code><a title="sqlite_integrated.Database.cursor" href="#sqlite_integrated.Database.cursor">cursor</a></code></li>
+<li><code><a title="sqlite_integrated.Database.default_id_field" href="#sqlite_integrated.Database.default_id_field">default_id_field</a></code></li>
+<li><code><a title="sqlite_integrated.Database.get_entry_by_id" href="#sqlite_integrated.Database.get_entry_by_id">get_entry_by_id</a></code></li>
 <li><code><a title="sqlite_integrated.Database.get_table" href="#sqlite_integrated.Database.get_table">get_table</a></code></li>
 <li><code><a title="sqlite_integrated.Database.get_table_collums" href="#sqlite_integrated.Database.get_table_collums">get_table_collums</a></code></li>
 <li><code><a title="sqlite_integrated.Database.get_table_info" href="#sqlite_integrated.Database.get_table_info">get_table_info</a></code></li>
 <li><code><a title="sqlite_integrated.Database.get_table_names" href="#sqlite_integrated.Database.get_table_names">get_table_names</a></code></li>
+<li><code><a title="sqlite_integrated.Database.get_table_raw" href="#sqlite_integrated.Database.get_table_raw">get_table_raw</a></code></li>
 <li><code><a title="sqlite_integrated.Database.is_table" href="#sqlite_integrated.Database.is_table">is_table</a></code></li>
+<li><code><a title="sqlite_integrated.Database.overview" href="#sqlite_integrated.Database.overview">overview</a></code></li>
+<li><code><a title="sqlite_integrated.Database.path" href="#sqlite_integrated.Database.path">path</a></code></li>
+<li><code><a title="sqlite_integrated.Database.raw_entry_to_entry" href="#sqlite_integrated.Database.raw_entry_to_entry">raw_entry_to_entry</a></code></li>
 <li><code><a title="sqlite_integrated.Database.save" href="#sqlite_integrated.Database.save">save</a></code></li>
+<li><code><a title="sqlite_integrated.Database.silent" href="#sqlite_integrated.Database.silent">silent</a></code></li>
+<li><code><a title="sqlite_integrated.Database.table_overview" href="#sqlite_integrated.Database.table_overview">table_overview</a></code></li>
 <li><code><a title="sqlite_integrated.Database.update_table_entry" href="#sqlite_integrated.Database.update_table_entry">update_table_entry</a></code></li>
 </ul>
+</li>
+<li>
+<h4><code><a title="sqlite_integrated.DatabaseEntry" href="#sqlite_integrated.DatabaseEntry">DatabaseEntry</a></code></h4>
+</li>
+<li>
+<h4><code><a title="sqlite_integrated.DatabaseException" href="#sqlite_integrated.DatabaseException">DatabaseException</a></code></h4>
 </li>
 </ul>
 </li>
