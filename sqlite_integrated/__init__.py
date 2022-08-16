@@ -52,10 +52,10 @@ class Database:
         self.cursor = self.conn.cursor()
         """The sqlite3 cursor"""
 
-        self.default_id_field = default_id_field #TODO
+        self.default_id_field = default_id_field
         """The default name for the id_field in returned DatabaseEntry"""
 
-        self.silent=silent #TODO
+        self.silent=silent
         """Disables all feedback in the form of prints"""
 
         self.conn.execute("PRAGMA foregin_keys = ON")
@@ -81,6 +81,10 @@ class Database:
         
         if get_only:
             if isinstance(get_only, list):
+                fields = self.get_table_collums(name)
+                for field in get_only:
+                    if not field in fields:
+                        raise DatabaseException(f"Table \"{name}\" contains no field/collum with the name: \"{field}\". Available fields are: {fields}")
                 selected = f"[{','.join(get_only)}]"
             else:
                 raise ValueError(f"get_only can either be ´None´ or ´list´. Got: {get_only}")
@@ -125,7 +129,7 @@ class Database:
         return(self.cursor.fetchall())
 
     def table_overview(self, name: str, max_len:int = 40, get_only = None):
-        """Returns a pretty table (with a name). Intended to to be run in a python shell or print with ´print´"""
+        """Prints and returns a pretty table (with a name)."""
         
         text = "" # the output text
 
@@ -174,21 +178,22 @@ class Database:
                 text += formatRow(row, longest_words) + "\n"
             text += "    .\n    .\n    .\n"
             for row in raw_table[-5:]:
-                text += formatRow(row, longest_words)
+                text += formatRow(row, longest_words) + "\n"
         else:
             for row in raw_table:
-                text += formatRow(row, longest_words)
-        return(text)
+                text += formatRow(row, longest_words) + "\n"
+            
+        print(text)
 
     def overview(self):
-        """Returns an overview of all the tables in the database with their fields. Intended to to be run in a python shell or print with ´print´"""
+        """Prints an overview of all the tables in the database with their fields."""
 
         text = "Tables\n"
         for table_name in self.get_table_names():
             text += "\t" + table_name + "\n"
             for col_name in self.get_table_collums(table_name):
                 text += "\t\t" + col_name + "\n"
-        return(text)
+        print(text)
 
 
     def get_table_collums(self, name: str):
