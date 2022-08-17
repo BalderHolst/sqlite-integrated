@@ -2,8 +2,44 @@ from dataclasses import fields
 import sqlite3
 import os
 
+# TODO testing! (pytest)
+
 def string_to_list(string: str) -> list:
     return(string.replace(" ", "").split(","))
+
+def value_to_sql_value(value):
+    if isinstance(value, str):
+        return(value.__repr__())
+    elif isinstance(value, list):
+        try:
+            return(",".join(value))
+        except TypeError:
+            raise TypeError("Cannot convert list on non-string objects to sql")
+    else:
+        return(value.__repr__())
+
+def raw_table_to_table(raw_table, fields):
+    table = []
+
+    if len(raw_table) == 0:
+        return([])
+    if len(raw_table[0]) != len(fields):
+        raise DatabaseException(f"There must be one raw collum per field")
+    
+    for raw_entry in raw_table:
+        entry = {}
+        for n, field in enumerate(fields):
+            entry[field] = raw_entry[n]
+        table.append(entry)
+    return(table)
+
+def dict_to_sql(data: dict) -> str:
+        set_list = []
+        for field in data:
+            set_list.append(f"{field} = {value_to_sql_value(data[field])}")
+        return(",".join(set_list))
+
+
 
 class DatabaseException(Exception):
     """Raised when the database fails to execute command"""
@@ -11,7 +47,7 @@ class DatabaseException(Exception):
 class QueryException(Exception):
     """Raised when trying to create an invalid or unsupperted query"""
 
-# TODO
+# TODO implement JOIN and LEFTJOIN (RIGHTJOIN?): https://www.w3schools.com/sql/sql_join.asp
 class Query:
     def __init__(self, db=None) -> None:
         """Initialize query"""
@@ -21,6 +57,10 @@ class Query:
         self.fields = None
         self.table = None
 
+        # self.data = None
+        # """For storing data for the next command"""
+
+
     def valid_prefixes(self, prefixes: list):
         """Check if a statement is valid given its prefix"""
         prefix = None
@@ -29,7 +69,6 @@ class Query:
         if prefix in prefixes:
             return(True)
         raise QueryException(f"Query syntax incorrect or not supported. Prefix: \"{prefix}\" is not a part of the valid prefixes: {prefixes}")
-
 
     def SELECT(self, selection="*"):
         self.valid_prefixes([None])
@@ -43,8 +82,6 @@ class Query:
             self.sql += f"SELECT {', '.join(selection)} "
         else:
             raise QueryException("SELECT statement selection must be either ´str´ or ´list´")
-
-        
         return(self)
 
     def FROM(self, table_name):
@@ -59,28 +96,86 @@ class Query:
         self.sql += f"FROM {table_name} "
         return(self)
 
-    def WHERE(self, pattern):
-        self.valid_prefixes(["FROM"])
+    def WHERE(self, col_name:str, value = None):
+        self.valid_prefixes(["FROM", "SET"])
         self.history.append("WHERE")
-        self.sql += f"WHERE {pattern} "
+        if value:
+            self.sql += f"WHERE {col_name} = {value_to_sql_value(value)}"
+        else:
+            self.sql += f"WHERE {col_name} "
+            if col_name.find("=") == -1: # expects LIKE statement
+                self.col = col_name.replace(" ", "")
         return(self)
 
-    def get_raw(self):
-        #TODO catch error of sql is not valid
+    def LIKE(self, pattern):
+        self.valid_prefixes(["WHERE"])
+        self.history.append("LIKE")
+        self.sql += f"LIKE {value_to_sql_value(pattern)} "
+        return(self)
+
+    def UPDATE(self, table_name: str):
+        self.valid_prefixes([None])
+        self.history.append("UPDATE")
+        if not self._db.is_table(table_name):
+            raise QueryException(f"Database has no table called {table_name!r}")
+        self.table = table_name
+        self.fields = self._db.get_table_collums(table_name)
+        self.sql += f"UPDATE {table_name} "
+        return(self)
+
+    def SET(self, data: dict):
+        self.valid_prefixes(["UPDATE"])
+        self.history.append("SET")
+
+        if not set(data).issubset(self.fields):
+            raise DatabaseException(f"Data keys: {set(data)} are not a subset of table fields/collums. Table fields/collums: {set(self.fields)}")
+        
+        self.sql += f"SET {dict_to_sql(data)} "
+
+        return(self)
+
+    def INSERT_INTO(self, table_name):
+        self.valid_prefixes([None])
+        self.history.append("INSERT_INTO")
+        self.table = table_name
+        self.fields = self._db.get_table_collums(table_name)
+        self.sql += f"INSERT INTO {table_name} "
+        return(self)
+
+    def VALUES(self, data: dict):
+        self.valid_prefixes(["INSERT_INTO"])
+        self.history.append("VALUES")
+
+        if not set(data).issubset(self.fields):
+            raise DatabaseException(f"Data keys: {set(data)} are not a subset of table fields/collums. Unknown keys: {set(data) - set(self.fields)}. Table fields/collums: {set(self.fields)}")
+
+        self.sql += f"({', '.join([str(v) for v in list(data)])}) VALUES ({', '.join([str(value_to_sql_value(v)) for v in data.values()])}) "
+        return(self)
+
+
+    # TODO get fields
+    def run(self, raw = False):
         if not self._db:
             raise DatabaseException("Query does not have a database to execute")
-        self._db.cursor.execute(self.sql)
-        return(self._db.cursor.fetchall())
 
-    # TODO implement
-    # TODO get fields
-    def get(self):
-        raw = self.get_raw()
-        return(raw)
+        try:
+            self._db.cursor.execute(self.sql)
+        except sqlite3.OperationalError as e:
+            raise QueryException(f"\n\n{e}\n\nError while running following sql: {self.sql}")
 
+        if not self._db.silent:
+            print(f"Executed sql: {self.sql}")
+
+        results = self._db.cursor.fetchall()
+
+        if len(results) == 0:
+            return(None)
+        if raw:
+            return(results)
+        return(raw_table_to_table(results, fields))
     
     def __repr__(self) -> str:
-        return(f"\"{self.sql}\"")
+        return(f"> {self.sql}<")
 
 
 class DatabaseEntry(dict):
@@ -186,7 +281,7 @@ class Database:
                 for field in get_only:
                     if not field in fields:
                         raise DatabaseException(f"Table \"{name}\" contains no field/collum with the name: \"{field}\". Available fields are: {fields}")
-                selected = f"[{','.join(get_only)}]"
+                selected = ','.join(get_only)
             else:
                 raise ValueError(f"get_only can either be ´None´ or ´list´. Got: {get_only}")
         
@@ -446,27 +541,31 @@ class Database:
         self.conn.close()
 
     def SELECT(self, pattern="*"):
-        """Start sql select query from the database. Returns a Query with a selection"""
+        """Start sql SELECT query from the database. Returns a Query to build from"""
         return(Query(db=self).SELECT(pattern))
+
+    def UPDATE(self, table_name):
+        """Start sql UPDATE query from the database. Returns a Query to build from"""
+        return(Query(db=self).UPDATE(table_name))
+
+    def INSERT_INTO(self, table_name):
+        """Start sql INSERT INTO query from the database. Returns a Query to build from"""
+        return(Query(db=self).INSERT_INTO(table_name))
+        
         
 
 if __name__ == "__main__": # for debugging
     db = Database("testing/test.db")
 
-    # db.overview()
+    db.table_overview("customers", max_len=10)
 
-    fields = "CustomerId,FirstName, LastName,Address, Email"
+    db.UPDATE("customers").SET({"FirstName": "Balder", "LastName": "Holst", "Company": "Sejt Firma 123"}).WHERE("FirstName").LIKE("L%").run()
+    
+    db.INSERT_INTO("customers").VALUES({"FirstName": "NytNavn", "LastName": "last name", "Email": "interesting@something.dk"}).run()
 
-    q = db.SELECT(fields).FROM("customers")
+    db.table_overview("customers", max_len=10)
 
-    raw_entry = q.get()[0]
 
-    entry = DatabaseEntry.from_raw_entry(raw_entry, fields, "customers", "CustomerId")
 
-    entry['FirstName'] = "Balder"
+    
 
-    db.update_entry(entry, part=True)
-
-    db.table_overview("customers")
-
-    print(entry)

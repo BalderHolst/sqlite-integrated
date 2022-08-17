@@ -14,6 +14,7 @@ setuptools.setup(
     long_description_content_type = "text/markdown",
     url = "https://github.com/BalderHolst/sqlite-integrated",
     license = "MIT",
+    package_dir={'': 'src'},
     python_requires = ">=3.7",
     install_requires = []
     )
