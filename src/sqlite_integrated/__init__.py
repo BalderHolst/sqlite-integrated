@@ -1,4 +1,3 @@
-from dataclasses import fields
 import sqlite3
 import os
 
@@ -14,6 +13,10 @@ def value_to_sql_value(value) -> str:
 
     if isinstance(value, str):
         return(value.__repr__())
+    elif isinstance(value, int):
+        return(str(value))
+    elif isinstance(value, float):
+        return(str(value))
     elif value == None:
         return("null")
     elif isinstance(value, list):
@@ -40,7 +43,7 @@ def raw_table_to_table(raw_table: list, fields: list, table_name: str, id_field)
     if len(raw_table) == 0:
         return([])
     if len(raw_table[0]) != len(fields):
-        raise DatabaseException(f"There must be one raw column per field")
+        raise DatabaseException(f"There must be one raw column per field. {raw_table[0] = }, {fields = }")
     
     for raw_entry in raw_table:
         entry = {}
@@ -113,7 +116,10 @@ class Query:
         self.history.append("SELECT")
 
         if isinstance(selection, str):
-            self.fields = string_to_list(selection)
+            if selection == "*":
+                self.fields = "*"
+            else:
+                self.fields = string_to_list(selection)
             self.sql += f"SELECT {selection} "
         elif isinstance(selection, list):
             self.fields = selection
@@ -131,11 +137,12 @@ class Query:
         """
 
         self.valid_prefixes(["SELECT"])
+        self.table = table_name
 
         if self._db:
             table_fields = set(self._db.get_table_columns(table_name)) # check if selected fields are in table
 
-        if not set(self.fields).issubset(table_fields):
+        if not set(self.fields).issubset(table_fields) and self.fields != "*":
             raise QueryException(f"Some selected field(s): {set(self.fields) - table_fields} are not fields/columns in the table: {table_name!r}. The table has the following fields: {table_fields}")
 
         self.history.append("FROM")
@@ -281,7 +288,10 @@ class Query:
         if raw:
             return(results)
 
-        return(raw_table_to_table(results, fields))
+        if self.fields == "*":
+            self.fields = db.get_table_columns(self.table)
+
+        return(raw_table_to_table(results, self.fields, self.table, None))
     
     def __repr__(self) -> str:
         return(f"> {self.sql.strip()} <")
@@ -304,10 +314,10 @@ class DatabaseEntry(dict):
         self.table = table
         self.update(entry_dict)
 
-        # check that id_field is in entry
-        if isinstance(id_field, str):
-            if not id_field in self:
-                raise DatabaseException(f"id_field: {id_field!r} is not a field in the entry. Entry fields are: {self.keys()}")
+        # # check that id_field is in entry
+        # if isinstance(id_field, str):
+        #     if not id_field in self:
+        #         raise DatabaseException(f"id_field: {id_field!r} is not a field in the entry. Entry fields are: {self.keys()}")
 
 
     @classmethod
@@ -430,7 +440,7 @@ class Database:
         self.cursor.execute(f"SELECT {selected} FROM {name}")
         return(self.cursor.fetchall())
 
-    def get_table(self, name: str, id_field="", get_only=None) -> list:
+    def get_table(self, name: str, id_field="", get_only=None, silent=False) -> list:
         """
         Returns all entries in a table as python dictionaries. This function loops over all entries in the table, so it is not the best in big databases.
 
@@ -443,7 +453,7 @@ class Database:
         """
 
         if id_field == "":
-            if not self.silent:
+            if not self.silent and not silent:
                 print(f"Using default id field: {self.default_id_field!r}")
             id_field = self.default_id_field
 
@@ -572,6 +582,42 @@ class Database:
                 entry[null_field] = None
             return(entry)
 
+
+    def get_entry_by_id(self, table, ID, id_field=None):
+        """
+        Get table entry by id.
+
+            Parameters:
+                table: Name of the table.
+                ID: The entry id.
+
+            Optional:
+                id_field: The field that holds the id value. Will use default if not set.
+        """
+
+        if not id_field:
+            id_field = self.default_id_field
+
+        if not self.is_table(table):
+            raise DatabaseException(f"Database contains no table with the name: \"{table}\". These are the available tables: {self.get_table_names()}")
+
+        sql = f"SELECT * FROM {table} WHERE {id_field} = {ID}"
+
+        self.cursor.execute(sql)
+
+        answer = self.cursor.fetchall()
+
+        # some checks
+        if len(answer) != 1:
+            if len(answer) > 1:
+                raise DatabaseException(f"There are more than one entry in table \"{table}\" with an id field \"{id_field}\" with the value \"{id}\": {answer}")
+            elif len(answer) == 0:
+                raise DatabaseException("There is no entry in table \"{table}\" with an id_field \"{id_field}\" with a value of {ID}")
+            else:
+                raise DatabaseException("Something went very wrong, please contact the package author") # this will never be run... i think
+
+        return(DatabaseEntry.from_raw_entry(answer[0], self.get_table_columns(table), table, id_field))
+
     #TODO implement ability to use dicts as well
     def add_table_entry(self, entry: DatabaseEntry, fill_null=False, silent=False):
         """
@@ -593,11 +639,11 @@ class Database:
         
         table_fields = self.get_table_columns(entry.table)
 
-        if set(entry) != set(table_fields):
-            raise DatabaseException(f"entry fields are not the same as the table fields: {set(entry)} != {set(table_fields)}")
-
         if fill_null:
             entry = self.fill_null(entry)
+
+        if set(entry) != set(table_fields):
+            raise DatabaseException(f"entry fields are not the same as the table fields: {set(entry)} != {set(table_fields)}")
 
         def question_marks(n):
             if n == 0:
@@ -684,41 +730,6 @@ class Database:
         if not silent and not self.silent:
             print(f"updated entry in table \"{entry.table}\": {entry}")
 
-
-    def get_entry_by_id(self, table, ID, id_field=None):
-        """
-        Get table entry by id.
-
-            Parameters:
-                table: Name of the table.
-                ID: The entry id.
-
-            Optional:
-                id_field: The field that holds the id value. Will use default if not set.
-        """
-
-        if not id_field:
-            id_field = self.default_id_field
-
-        if not self.is_table(table):
-            raise DatabaseException(f"Database contains no table with the name: \"{table}\". These are the available tables: {self.get_table_names()}")
-
-        sql = f"SELECT * FROM {table} WHERE {id_field} = {ID}"
-
-        self.cursor.execute(sql)
-
-        answer = self.cursor.fetchall()
-
-        # some checks
-        if len(answer) != 1:
-            if len(answer) > 1:
-                raise DatabaseException(f"There are more than one entry in table \"{table}\" with an id field \"{id_field}\" with the value \"{id}\": {answer}")
-            elif len(answer) == 0:
-                raise DatabaseException("There is no entry in table \"{table}\" with an id_field \"{id_field}\" with a value of {ID}")
-            else:
-                raise DatabaseException("Something went very wrong, please contact the package author") # this will never be run... i think
-
-        return(DatabaseEntry.from_raw_entry(answer[0]), self.get_table_columns(table), table, id_field)
         
     def save(self):
         """Writes any changes to the database file"""
@@ -727,8 +738,15 @@ class Database:
     
     def close(self):
         """saves and closes the database. If you want to explicitly close without saving use: ´self.conn.close()´"""
+
         self.conn.commit()
         self.conn.close()
+
+    def reconnect(self):
+        """Reopen database after closing it"""
+
+        self.conn = sqlite3.connect(self.path)
+        self.cursor = self.conn.cursor()
 
     def SELECT(self, pattern="*"):
         """
@@ -759,4 +777,15 @@ class Database:
 
         return(Query(db=self).INSERT_INTO(table_name))
         
+    def __eq__(self, other: object) -> bool:
+        tables = self.get_table_names()
+        if tables != other.get_table_names():
+            return(False)
 
+        for table in tables:
+            if self.get_table_raw(table) != other.get_table_raw(table):
+                return(False)
+            elif self.get_table_info(table) != other.get_table_info(table):
+                return(False)
+
+        return(True)
