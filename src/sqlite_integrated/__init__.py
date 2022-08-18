@@ -6,10 +6,12 @@ import os
 
 def string_to_list(string: str) -> list:
     """Tankes a string with comma seperated values, returns a list of the values. (spaces are ignored)"""
+
     return(string.replace(" ", "").split(","))
 
 def value_to_sql_value(value) -> str:
     """Converts python values to sql values. Basically just puts quotes around strings and not ints or floats. Also converts None to null"""
+
     if isinstance(value, str):
         return(value.__repr__())
     elif value == None:
@@ -32,6 +34,7 @@ def raw_table_to_table(raw_table: list, fields: list, table_name: str, id_field)
             table_name: The name of the table (in the database) that the data belongs to. Ex: "people"
             id_field: The name of the column which stores the id. Ex: "id". This can be set to ´None´ but needs to be provided when writing entries back into the database.
     """
+
     table = []
 
     if len(raw_table) == 0:
@@ -48,6 +51,7 @@ def raw_table_to_table(raw_table: list, fields: list, table_name: str, id_field)
 
 def dict_to_sql(data: dict) -> str:
     """Converts a dict into sql key value pairs. Ex: \"key1 = value1, key2 = value2...\""""
+    
     set_list = []
     for field in data:
         set_list.append(f"{field} = {value_to_sql_value(data[field])}")
@@ -71,6 +75,7 @@ class Query:
             Optional:
                 db: The attached Database. This is the default database to run queries on.
         """
+        
         self._db = db
         """The attached Database"""
 
@@ -88,6 +93,7 @@ class Query:
 
     def valid_prefixes(self, prefixes: list):
         """Check if a statement is valid given its prefix"""
+
         prefix = None
         if len(self.history) > 0:
             prefix = self.history[-1]
@@ -123,6 +129,7 @@ class Query:
             Parameters:
                 table_name: Name of the table you are selecting from.
         """
+
         self.valid_prefixes(["SELECT"])
 
         if self._db:
@@ -146,6 +153,7 @@ class Query:
                 value: The value of the column.
 
         """
+
         self.valid_prefixes(["FROM", "SET"])
         self.history.append("WHERE")
         if value != "":
@@ -166,6 +174,7 @@ class Query:
             Parameters:
                 pattern: A typical sql LIKE pattern with % and _.
         """
+
         self.valid_prefixes(["WHERE"])
         self.history.append("LIKE")
         self.sql += f"LIKE {value_to_sql_value(pattern)} "
@@ -178,6 +187,7 @@ class Query:
             Parameters:
                 table_name: Name of the table you are updating.
         """
+
         self.valid_prefixes([None])
         self.history.append("UPDATE")
         if self._db:
@@ -195,6 +205,7 @@ class Query:
             Parameters:
                 data: A dictionaty with key and value pairs.
         """
+
         self.valid_prefixes(["UPDATE"])
         self.history.append("SET")
 
@@ -212,6 +223,7 @@ class Query:
             Parameters: 
                 table_name: Name of the table you want to insert into.
         """
+
         self.valid_prefixes([None])
         self.history.append("INSERT_INTO")
         self.table = table_name
@@ -227,6 +239,7 @@ class Query:
             Parameters:
                 data: Dictionary with key value pairs.
         """
+
         self.valid_prefixes(["INSERT_INTO"])
         self.history.append("VALUES")
 
@@ -245,6 +258,7 @@ class Query:
                 db: The database to execute to query on.
                 raw: If True: returns the raw table (list of tuples) instead of the normal table.
         """
+
         
         if not db:
             db = self._db
@@ -275,6 +289,7 @@ class Query:
 
 class DatabaseEntry(dict):
     """A python dictionary that keeps track of the table where it came from, and the name and value of its id field. This class is not supposed to be created manually"""
+
     def __init__(self, entry_dict: dict, table: str, id_field):
         """"
         Constructs the entry by saving the table and id_field as attributes. The ´entry_dict´ is used to populate this object with data.
@@ -284,6 +299,7 @@ class DatabaseEntry(dict):
                 table:      The name of the table the entry is a part of
                 entry_dict: A dictionary containing all the information. This information can be accesed just like any other python dict with ´my_entry[my_key]´.
         """
+
         self.id_field = id_field
         self.table = table
         self.update(entry_dict)
@@ -297,7 +313,7 @@ class DatabaseEntry(dict):
     @classmethod
     def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, id_field):
         """
-        Alternative constructor for converting a raw entry to a DatabaseEntry
+        Alternative constructor for converting a raw entry to a DatabaseEntry.
         
             Parameters:
                 raw_entry: A tuple with the data for the entry. Ex: ´(2, "Tom", "Builder", 33)´
@@ -324,9 +340,12 @@ class DatabaseEntry(dict):
 
     def __repr__(self) -> str:
         """Represent a Database entry"""
+
         return f"DatabaseEntry(table: {self.table}, data: {super().__repr__()})"
 
 
+# TODO implement export to csv
+# TODO implement import from csv
 class Database:
     """Main database class for manipulating sqlite3 databases"""
 
@@ -342,6 +361,7 @@ class Database:
                 default_id_field:   The default name for the id field in tables
                 silent:             Disables all feedback in the form of prints 
         """
+
         if not new and not os.path.isfile(path):
             raise(DatabaseException(f"no database file at \"{path}\". If you want to create one, pass \"new=True\""))
 
@@ -364,6 +384,7 @@ class Database:
 
     def get_table_names(self) -> list:
         """Returns the names of all tables in the database."""
+
         res = self.conn.execute("SELECT name FROM sqlite_master WHERE type='table';")
         names = []
         for name in res:
@@ -378,6 +399,7 @@ class Database:
                 table_name: Name to check.
 
         """
+
         if table_name in self.get_table_names():
             return True
         return False
@@ -437,6 +459,7 @@ class Database:
             Parameters:
                 name: Name of the table.
         """
+
         self.cursor.execute(f"PRAGMA table_info({name});")
         return(self.cursor.fetchall())
 
@@ -526,6 +549,7 @@ class Database:
                 name: Name of the table.
 
         """
+
         keys = []
 
         for info in self.get_table_info(name):
@@ -539,6 +563,7 @@ class Database:
                 Parameters:
                     entry: The DatabaseEntry.
             """
+
             t_fields = self.get_table_columns(entry.table)
             e_fields = list(entry)
             for f in e_fields:
@@ -670,7 +695,6 @@ class Database:
 
             Optional:
                 id_field: The field that holds the id value. Will use default if not set.
-
         """
 
         if not id_field:
@@ -698,6 +722,7 @@ class Database:
         
     def save(self):
         """Writes any changes to the database file"""
+
         self.conn.commit()
     
     def close(self):
@@ -712,6 +737,7 @@ class Database:
             Optional:
                 pattern: Either a python list or sql list of table names.
         """
+
         return(Query(db=self).SELECT(pattern))
 
     def UPDATE(self, table_name):
@@ -730,6 +756,7 @@ class Database:
             Parameters:
                 table_name: Name of the table.
         """
+
         return(Query(db=self).INSERT_INTO(table_name))
         
 
