@@ -5,40 +5,53 @@ import os
 # TODO testing! (pytest)
 
 def string_to_list(string: str) -> list:
+    """Tankes a string with comma seperated values, returns a list of the values. (spaces are ignored)"""
     return(string.replace(" ", "").split(","))
 
-def value_to_sql_value(value):
+def value_to_sql_value(value) -> str:
+    """Converts python values to sql values. Basically just puts quotes around strings and not ints or floats. Also converts None to null"""
     if isinstance(value, str):
         return(value.__repr__())
+    elif value == None:
+        return("null")
     elif isinstance(value, list):
         try:
             return(",".join(value))
         except TypeError:
             raise TypeError("Cannot convert list on non-string objects to sql")
     else:
-        return(value.__repr__())
+        raise TypeError(f"Cannot convert value of type {type(value)} to sql")
 
-def raw_table_to_table(raw_table, fields):
+def raw_table_to_table(raw_table: list, fields: list, table_name: str, id_field):
+    """
+    Convert a raw table (list of tuples) to a table (table of dictionaries)
+
+        Parameters:
+            raw_entry: A tuple with the data for the entry. Ex: ´(2, "Tom", "Builder", 33)´
+            fields: A list of column names for the data. Ex: ´["id", "FirstName", "LastName", "Age"]´
+            table_name: The name of the table (in the database) that the data belongs to. Ex: "people"
+            id_field: The name of the column which stores the id. Ex: "id". This can be set to ´None´ but needs to be provided when writing entries back into the database.
+    """
     table = []
 
     if len(raw_table) == 0:
         return([])
     if len(raw_table[0]) != len(fields):
-        raise DatabaseException(f"There must be one raw collum per field")
+        raise DatabaseException(f"There must be one raw column per field")
     
     for raw_entry in raw_table:
         entry = {}
         for n, field in enumerate(fields):
             entry[field] = raw_entry[n]
-        table.append(entry)
+        table.append(DatabaseEntry(entry, table_name, id_field))
     return(table)
 
 def dict_to_sql(data: dict) -> str:
-        set_list = []
-        for field in data:
-            set_list.append(f"{field} = {value_to_sql_value(data[field])}")
-        return(",".join(set_list))
-
+    """Converts a dict into sql key value pairs. Ex: \"key1 = value1, key2 = value2...\""""
+    set_list = []
+    for field in data:
+        set_list.append(f"{field} = {value_to_sql_value(data[field])}")
+    return(", ".join(set_list))
 
 
 class DatabaseException(Exception):
@@ -49,17 +62,29 @@ class QueryException(Exception):
 
 # TODO implement JOIN and LEFTJOIN (RIGHTJOIN?): https://www.w3schools.com/sql/sql_join.asp
 class Query:
+    """A class for writing sql queries. Queries can be run on the attached database or a seperate one with the ´run´ method"""
+
     def __init__(self, db=None) -> None:
-        """Initialize query"""
+        """
+        Initialize query
+
+            Optional:
+                db: The attached Database. This is the default database to run queries on.
+        """
         self._db = db
+        """The attached Database"""
+
         self.sql = ""
+        """The current raw sql command"""
+
         self.history = []
+        """The history of commandmethods run on this object"""
+        
         self.fields = None
+        """The selected fields"""
+
         self.table = None
-
-        # self.data = None
-        # """For storing data for the next command"""
-
+        """The table the sql query is interacting with"""
 
     def valid_prefixes(self, prefixes: list):
         """Check if a statement is valid given its prefix"""
@@ -71,6 +96,13 @@ class Query:
         raise QueryException(f"Query syntax incorrect or not supported. Prefix: \"{prefix}\" is not a part of the valid prefixes: {prefixes}")
 
     def SELECT(self, selection="*"):
+        """
+        Sql SELECT statement.
+            
+            Optional:
+                selection: Either a python list or sql list of table names.
+        """
+        
         self.valid_prefixes([None])
         self.history.append("SELECT")
 
@@ -85,22 +117,42 @@ class Query:
         return(self)
 
     def FROM(self, table_name):
+        """
+        Sql FROM statement. Has to be preceded by a SELECT statement.
+
+            Parameters:
+                table_name: Name of the table you are selecting from.
+        """
         self.valid_prefixes(["SELECT"])
-        
-        # check if selected fields are in table
-        table_fields = set(self._db.get_table_collums(table_name))
+
+        if self._db:
+            table_fields = set(self._db.get_table_columns(table_name)) # check if selected fields are in table
+
         if not set(self.fields).issubset(table_fields):
-            raise QueryException(f"Some selected field(s): {set(self.fields) - table_fields} are not fields/collums in the table: {table_name!r}. The table has the following fields: {table_fields}")
+            raise QueryException(f"Some selected field(s): {set(self.fields) - table_fields} are not fields/columns in the table: {table_name!r}. The table has the following fields: {table_fields}")
 
         self.history.append("FROM")
         self.sql += f"FROM {table_name} "
         return(self)
 
-    def WHERE(self, col_name:str, value = None):
+    def WHERE(self, col_name:str, value = ""):
+        """
+        Sql WHERE statement.
+
+            Parameters:
+                col_name: The name of the column. You can also just pass it a statement like: ´"id" = 4´ instead of providing a value.
+
+            Optional:
+                value: The value of the column.
+
+        """
         self.valid_prefixes(["FROM", "SET"])
         self.history.append("WHERE")
-        if value:
-            self.sql += f"WHERE {col_name} = {value_to_sql_value(value)}"
+        if value != "":
+            if value == None:
+                self.sql += f"WHERE {col_name} is null"
+            else:
+                self.sql += f"WHERE {col_name} = {value_to_sql_value(value)}"
         else:
             self.sql += f"WHERE {col_name} "
             if col_name.find("=") == -1: # expects LIKE statement
@@ -108,74 +160,117 @@ class Query:
         return(self)
 
     def LIKE(self, pattern):
+        """
+        Sql WHERE statement. Has to be preceded by a WHERE statement.
+
+            Parameters:
+                pattern: A typical sql LIKE pattern with % and _.
+        """
         self.valid_prefixes(["WHERE"])
         self.history.append("LIKE")
         self.sql += f"LIKE {value_to_sql_value(pattern)} "
         return(self)
 
     def UPDATE(self, table_name: str):
+        """
+        Sql UPDATE statement.
+
+            Parameters:
+                table_name: Name of the table you are updating.
+        """
         self.valid_prefixes([None])
         self.history.append("UPDATE")
-        if not self._db.is_table(table_name):
-            raise QueryException(f"Database has no table called {table_name!r}")
+        if self._db:
+            if not self._db.is_table(table_name):
+                raise QueryException(f"Database has no table called {table_name!r}")
+            self.fields = self._db.get_table_columns(table_name)
         self.table = table_name
-        self.fields = self._db.get_table_collums(table_name)
         self.sql += f"UPDATE {table_name} "
         return(self)
 
     def SET(self, data: dict):
+        """
+        Sql SET statement. Must be preceded by an UPDATE statement.
+
+            Parameters:
+                data: A dictionaty with key and value pairs.
+        """
         self.valid_prefixes(["UPDATE"])
         self.history.append("SET")
 
         if not set(data).issubset(self.fields):
-            raise DatabaseException(f"Data keys: {set(data)} are not a subset of table fields/collums. Table fields/collums: {set(self.fields)}")
+            raise DatabaseException(f"Data keys: {set(data)} are not a subset of table fields/columns. Table fields/columns: {set(self.fields)}")
         
         self.sql += f"SET {dict_to_sql(data)} "
 
         return(self)
 
     def INSERT_INTO(self, table_name):
+        """
+        Sql INSERT INTO statement.
+
+            Parameters: 
+                table_name: Name of the table you want to insert into.
+        """
         self.valid_prefixes([None])
         self.history.append("INSERT_INTO")
         self.table = table_name
-        self.fields = self._db.get_table_collums(table_name)
+        if self._db:
+            self.fields = self._db.get_table_columns(table_name)
         self.sql += f"INSERT INTO {table_name} "
         return(self)
 
     def VALUES(self, data: dict):
+        """
+        Sql VALUES statement. Must be preceded by INSERT_INTO statement.
+
+            Parameters:
+                data: Dictionary with key value pairs.
+        """
         self.valid_prefixes(["INSERT_INTO"])
         self.history.append("VALUES")
 
         if not set(data).issubset(self.fields):
-            raise DatabaseException(f"Data keys: {set(data)} are not a subset of table fields/collums. Unknown keys: {set(data) - set(self.fields)}. Table fields/collums: {set(self.fields)}")
+            raise DatabaseException(f"Data keys: {set(data)} are not a subset of table fields/columns. Unknown keys: {set(data) - set(self.fields)}. Table fields/columns: {set(self.fields)}")
 
         self.sql += f"({', '.join([str(v) for v in list(data)])}) VALUES ({', '.join([str(value_to_sql_value(v)) for v in data.values()])}) "
         return(self)
 
 
-    # TODO get fields
-    def run(self, raw = False):
-        if not self._db:
+    def run(self, db=None, raw = False):
+        """
+        Execute the query in the attached database or in a seperate one. Returns the results in a table (list of DatabaseEntry) or ´None´ if no results.
+
+            Optional:
+                db: The database to execute to query on.
+                raw: If True: returns the raw table (list of tuples) instead of the normal table.
+        """
+        
+        if not db:
+            db = self._db
+
+        if not db:
             raise DatabaseException("Query does not have a database to execute")
 
         try:
-            self._db.cursor.execute(self.sql)
+            db.cursor.execute(self.sql)
         except sqlite3.OperationalError as e:
             raise QueryException(f"\n\n{e}\n\nError while running following sql: {self.sql}")
 
-        if not self._db.silent:
+        if not db.silent:
             print(f"Executed sql: {self.sql}")
 
-        results = self._db.cursor.fetchall()
+        results = db.cursor.fetchall()
 
         if len(results) == 0:
             return(None)
         if raw:
             return(results)
+
         return(raw_table_to_table(results, fields))
     
     def __repr__(self) -> str:
-        return(f"> {self.sql}<")
+        return(f"> {self.sql.strip()} <")
 
 
 class DatabaseEntry(dict):
@@ -185,7 +280,7 @@ class DatabaseEntry(dict):
         Constructs the entry by saving the table and id_field as attributes. The ´entry_dict´ is used to populate this object with data.
 
             Parameters:
-                id_field: The collum name for the entry's id
+                id_field: The column name for the entry's id
                 table:      The name of the table the entry is a part of
                 entry_dict: A dictionary containing all the information. This information can be accesed just like any other python dict with ´my_entry[my_key]´.
         """
@@ -200,8 +295,17 @@ class DatabaseEntry(dict):
 
 
     @classmethod
-    def from_raw_entry(cls, raw_entry: tuple, table_fields, table_name: str, id_field):
-        print(raw_entry)
+    def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, id_field):
+        """
+        Alternative constructor for converting a raw entry to a DatabaseEntry
+        
+            Parameters:
+                raw_entry: A tuple with the data for the entry. Ex: ´(2, "Tom", "Builder", 33)´
+                table_fields: A list of column names for the data. Ex: ´["id", "FirstName", "LastName", "Age"]´
+                table_name: The name of the table (in the database) that the data belongs to. Ex: "people"
+                id_field: The name of the column which stores the id. Ex: "id". This can be set to ´None´ but needs to be provided when writing this entry back into the database.
+        """
+
         entry_dict = {}
 
         if isinstance(table_fields, str):
@@ -219,45 +323,47 @@ class DatabaseEntry(dict):
         
 
     def __repr__(self) -> str:
+        """Represent a Database entry"""
         return f"DatabaseEntry(table: {self.table}, data: {super().__repr__()})"
 
 
 class Database:
-    """
-    Main database class for manipulating sqlite3 databases
-
-        Parameters:
-            path:               Path to the database file
-
-        Optional
-            new:                A new blank database will be created where the ´self.path´ is pointing
-            default_id_field:   The default name for the id field in tables
-            silent:             Disables all feedback in the form of prints 
-    """
+    """Main database class for manipulating sqlite3 databases"""
 
     def __init__(self, path: str, new = False, default_id_field="id", silent=False):
+        """
+        Constructor for Database
+
+            Parameters:
+                path:               Path to the database file
+
+            Optional
+                new:                A new blank database will be created where the ´self.path´ is pointing
+                default_id_field:   The default name for the id field in tables
+                silent:             Disables all feedback in the form of prints 
+        """
         if not new and not os.path.isfile(path):
             raise(DatabaseException(f"no database file at \"{path}\". If you want to create one, pass \"new=True\""))
 
         self.path = path
-        """Path to the database file"""
+        """Path to the database file."""
 
         self.conn = sqlite3.connect(path)
-        """The sqlite3 connection"""
+        """The sqlite3 connection."""
 
         self.cursor = self.conn.cursor()
-        """The sqlite3 cursor"""
+        """The sqlite3 cursor. Use ´cursor.execute(cmd)´ to execute raw sql"""
 
         self.default_id_field = default_id_field
-        """The default name for the id_field in returned DatabaseEntry"""
+        """The default name for the id_field in returned DatabaseEntry."""
 
         self.silent=silent
-        """Disables all feedback in the form of prints"""
+        """Disables all feedback in the form of prints."""
 
         self.conn.execute("PRAGMA foregin_keys = ON")
 
     def get_table_names(self) -> list:
-        """Returns the names of all tables in the database"""
+        """Returns the names of all tables in the database."""
         res = self.conn.execute("SELECT name FROM sqlite_master WHERE type='table';")
         names = []
         for name in res:
@@ -265,22 +371,36 @@ class Database:
         return(names)
     
     def is_table(self, table_name: str) -> bool:
-        """Check if database has a table with a certain name"""
+        """
+        Check if database has a table with a certain name.
+        
+            Parameters:
+                table_name: Name to check.
+
+        """
         if table_name in self.get_table_names():
             return True
         return False
 
     def get_table_raw(self, name: str, get_only = None) -> list:
-        """Returns all entries in a table as tuples"""
+        """
+        Returns all entries in a table as a list of tuples
+        
+            Parameters:
+                name: Name of the table.
+
+            Optional:
+                get_only: Can be set to a list of column/field names, to only retrieve those columns/fields.
+        """
 
         selected = "*"
         
         if get_only:
             if isinstance(get_only, list):
-                fields = self.get_table_collums(name)
+                fields = self.get_table_columns(name)
                 for field in get_only:
                     if not field in fields:
-                        raise DatabaseException(f"Table \"{name}\" contains no field/collum with the name: \"{field}\". Available fields are: {fields}")
+                        raise DatabaseException(f"Table \"{name}\" contains no field/column with the name: \"{field}\". Available fields are: {fields}")
                 selected = ','.join(get_only)
             else:
                 raise ValueError(f"get_only can either be ´None´ or ´list´. Got: {get_only}")
@@ -288,44 +408,50 @@ class Database:
         self.cursor.execute(f"SELECT {selected} FROM {name}")
         return(self.cursor.fetchall())
 
-    def raw_entry_to_entry(self, raw_entry: tuple, table: str, id_field, fields=None) -> DatabaseEntry:
-        """Convert a raw entry (tuple) to a DatabaseEntry"""
+    def get_table(self, name: str, id_field="", get_only=None) -> list:
+        """
+        Returns all entries in a table as python dictionaries. This function loops over all entries in the table, so it is not the best in big databases.
 
-        if not fields:
-            fields = self.get_table_collums(table)
-        entry = {}
-        for i, field in enumerate(fields):
-            entry[field] = raw_entry[i]
-        return(DatabaseEntry(entry, table, id_field))
+            Parameters:
+                name: Name of the table.
 
+            Optional:
+                id_field: The id_field of the table. Will be set to the database default if not set.
+                get_only: Can be set to a list of column/field names, to only retrieve those columns/fields.
+        """
 
-    def get_table(self, name: str, get_only=None, id_field=None) -> list:
-        """Returns all entries in a table as python dictionaries. This function loops over all entries in the table, so it is not the best in big databases"""
-
-        if not id_field:
+        if id_field == "":
+            if not self.silent:
+                print(f"Using default id field: {self.default_id_field!r}")
             id_field = self.default_id_field
 
-        tuples = self.get_table_raw(name, get_only)
-
-        fields = []
-        if get_only:
-            fields = get_only
-        else:
-            fields = self.get_table_collums(name)
-
-        dict_table = []
-        for raw_entry in tuples:
-            dict_table.append(self.raw_entry_to_entry(raw_entry, name, id_field, fields=fields))
-        return(dict_table)
+        raw_table = self.get_table_raw(name, get_only)
+            
+        return(raw_table_to_table(raw_table, self.get_table_columns(name), name, id_field))
 
 
     def get_table_info(self, name: str):
-        """Returns sql information about a table (runs PRAGMA TABLE_INFO(name))"""
+        """
+        Returns sql information about a table (runs ´PRAGMA TABLE_INFO(name)´).
+
+            Parameters:
+                name: Name of the table.
+        """
         self.cursor.execute(f"PRAGMA table_info({name});")
         return(self.cursor.fetchall())
 
     def table_overview(self, name: str, max_len:int = 40, get_only = None):
-        """Prints and returns a pretty table (with a name)."""
+        """
+        Prints a pretty table (with a name).
+
+            Parameters:
+                name: Name of the table.
+
+            Optional:
+                max_len: The max number of rows shown.
+                get_only: If given a list of column/field names: only shows those
+                
+        """
         
         text = "" # the output text
 
@@ -334,7 +460,7 @@ class Database:
         if get_only:
             fields = get_only
         else:
-            fields = self.get_table_collums(name)
+            fields = self.get_table_columns(name)
 
         cols = len(fields)
 
@@ -362,7 +488,7 @@ class Database:
 
         # This block is for placing the intersections
         offset = 0
-        for n in longest_words[:-1]: # we dont create the an intersection after the last collum
+        for n in longest_words[:-1]: # we dont create the an intersection after the last column
             offset += n
             underline = underline[:offset +1] + "╬" + underline[offset:]
             offset += len(seperator)
@@ -387,21 +513,33 @@ class Database:
         text = "Tables\n"
         for table_name in self.get_table_names():
             text += "\t" + table_name + "\n"
-            for col_name in self.get_table_collums(table_name):
+            for col_name in self.get_table_columns(table_name):
                 text += "\t\t" + col_name + "\n"
         print(text)
 
 
-    def get_table_collums(self, name: str):
-        """Returns the collum names for a given table"""
+    def get_table_columns(self, name: str):
+        """
+        Returns the column names for a given table
+        
+            Parameters:
+                name: Name of the table.
+
+        """
         keys = []
 
         for info in self.get_table_info(name):
             keys.append(list(info)[1])
         return(keys)
 
-    def fill_null(self, entry):
-            t_fields = self.get_table_collums(entry.table)
+    def fill_null(self, entry: DatabaseEntry):
+            """
+            Fills out any unpopulated fields in a DatabaseEntry (fields that exist in the database but not in the entry).
+
+                Parameters:
+                    entry: The DatabaseEntry.
+            """
+            t_fields = self.get_table_columns(entry.table)
             e_fields = list(entry)
             for f in e_fields:
                 t_fields.remove(f)
@@ -411,23 +549,30 @@ class Database:
 
     #TODO implement ability to use dicts as well
     def add_table_entry(self, entry: DatabaseEntry, fill_null=False, silent=False):
-        """Add an entry to the database. The entry must have values for all fields in the table. You can pass ´fill_null=True´ to fill remaining fields with None/null. Use ´silent=True´ to suppress warnings and messages."""
+        """
+        Add an entry to the database. The entry must have values for all fields in the table. You can pass ´fill_null=True´ to fill remaining fields with None/null. Use ´silent=True´ to suppress warnings and messages.
 
-        if 'id' in entry:
+            Parameters:
+                entry: The entry. The entry must NOT have an id_field (it has to be ´None´: ´entry.id_field = None´).
+
+            Optional:
+                fill_null: Fill in unpopulated fields with null values.
+                silent: If True: disables prints.
+        """
+
+        if entry.id_field:
             raise DatabaseException(f"Cannot add entry with a preexisting id ({entry['id']})")
 
         if not self.is_table(entry.table):
             raise DatabaseException(f"Database has no table with the name \"{self.table}\". Possible tablenames are: {self.get_table_names()}")
         
-        table_fields = self.get_table_collums(entry.table)
+        table_fields = self.get_table_columns(entry.table)
 
         if set(entry) != set(table_fields):
             raise DatabaseException(f"entry fields are not the same as the table fields: {set(entry)} != {set(table_fields)}")
 
         if fill_null:
             entry = self.fill_null(entry)
-
-        # raise DatabaseException(f"Missing fields to insert into \"{table}\" table: {table_fields}")
 
         def question_marks(n):
             if n == 0:
@@ -453,12 +598,22 @@ class Database:
         if not silent:
             print(f"added entry to table \"{entry.table}\": {entry}")
 
-    def test():
-        pass
 
+    def update_entry(self, entry: dict, table=None, id_field:str = None, part=False, fill_null=False, silent=False):
+        """
+        Update entry in database with a DatabaseEntry, or with a dictionary + the name of the table you want to update.
 
-    def update_entry(self, entry: dict, table=None, id_field:str = None, fill_null=False, silent=False, part=False):
-        """Update entry in database with a DatabaseEntry or with a dictionary and a the name of the table you want to update."""
+            Parameters:
+                entry: DatabaseEntry or dictionary, if dictionary you also need to provide table and id_field.
+
+            Optional:
+                table: The table name.
+                id_field: The field that holds the entry id.
+                part: If True: Only updates the provided fields.
+                fill_null: Fill in unpopulated fields with null values.
+                silent: If True: disables prints.
+
+        """
 
         if not isinstance(entry, DatabaseEntry): # the input is a dict
             if not table:
@@ -480,7 +635,7 @@ class Database:
             entry = self.fill_null(entry)
 
         # check that entry fields and table fields match
-        table_fields = self.get_table_collums(entry.table)
+        table_fields = self.get_table_columns(entry.table)
         if set(table_fields) != set(entry):
             if not (part and set(entry).issubset(set(table_fields))):
                 raise DatabaseException(f"Table fields do not match entry fields: {table_fields} != {list(entry)}. Pass ´part = True´ or ´fill_null = True´ if entry are a subset of the table fields")
@@ -506,7 +661,17 @@ class Database:
 
 
     def get_entry_by_id(self, table, ID, id_field=None):
-        """Get table entry by id"""
+        """
+        Get table entry by id.
+
+            Parameters:
+                table: Name of the table.
+                ID: The entry id.
+
+            Optional:
+                id_field: The field that holds the id value. Will use default if not set.
+
+        """
 
         if not id_field:
             id_field = self.default_id_field
@@ -529,7 +694,7 @@ class Database:
             else:
                 raise DatabaseException("Something went very wrong, please contact the package author") # this will never be run... i think
 
-        return(self.raw_entry_to_entry(answer[0], table, id_field=id_field))
+        return(DatabaseEntry.from_raw_entry(answer[0]), self.get_table_columns(table), table, id_field)
         
     def save(self):
         """Writes any changes to the database file"""
@@ -541,31 +706,30 @@ class Database:
         self.conn.close()
 
     def SELECT(self, pattern="*"):
-        """Start sql SELECT query from the database. Returns a Query to build from"""
+        """
+        Start sql SELECT query from the database. Returns a Query to build from.
+
+            Optional:
+                pattern: Either a python list or sql list of table names.
+        """
         return(Query(db=self).SELECT(pattern))
 
     def UPDATE(self, table_name):
-        """Start sql UPDATE query from the database. Returns a Query to build from"""
+        """
+        Start sql UPDATE query from the database. Returns a Query to build from.
+
+            Parameters:
+                table_name: Name of the table.
+        """
         return(Query(db=self).UPDATE(table_name))
 
     def INSERT_INTO(self, table_name):
-        """Start sql INSERT INTO query from the database. Returns a Query to build from"""
+        """
+        Start sql INSERT INTO query from the database. Returns a Query to build from.
+
+            Parameters:
+                table_name: Name of the table.
+        """
         return(Query(db=self).INSERT_INTO(table_name))
         
-        
-
-if __name__ == "__main__": # for debugging
-    db = Database("testing/test.db")
-
-    db.table_overview("customers", max_len=10)
-
-    db.UPDATE("customers").SET({"FirstName": "Balder", "LastName": "Holst", "Company": "Sejt Firma 123"}).WHERE("FirstName").LIKE("L%").run()
-    
-    db.INSERT_INTO("customers").VALUES({"FirstName": "NytNavn", "LastName": "last name", "Email": "interesting@something.dk"}).run()
-
-    db.table_overview("customers", max_len=10)
-
-
-
-    
 
