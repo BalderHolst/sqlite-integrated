@@ -12,11 +12,6 @@ Welcome to Sqlite-Integrated's documentation!
    :maxdepth: 4
    :caption: Contents:
 
-   intro
-   strings
-   datatypes
-   numeric
-
 
 Indices and tables
 ==================
