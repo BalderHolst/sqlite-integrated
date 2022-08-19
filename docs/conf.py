@@ -4,8 +4,6 @@
 # list see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-# imports
-import sphinx_bootstrap_theme
 
 # -- Path setup --------------------------------------------------------------
 
@@ -56,9 +54,11 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 #
 # html_theme = 'alabaster'
 
+html_theme = "sphinx_documatt_theme"
 
-html_theme = 'bootstrap'
-html_theme_path = sphinx_bootstrap_theme.get_html_theme_path()
+# import sphinx_bootstrap_theme
+# html_theme = 'bootstrap'
+# html_theme_path = sphinx_bootstrap_theme.get_html_theme_path()
 
 
 ########################################
