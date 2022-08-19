@@ -26,9 +26,7 @@
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">__docformat__ = &#34;numpy&#34;
-
-import sqlite3
+<pre><code class="python">import sqlite3
 import os
 
 # TODO testing! (pytest)
@@ -62,14 +60,15 @@ def raw_table_to_table(raw_table: list, fields: list, table_name: str, id_field)
     Convert a raw table (list of tuples) to a table (table of dictionaries)
 
     Parameters
-        raw_entry
-            A tuple with the data for the entry. Ex: ´(2, &#34;Tom&#34;, &#34;Builder&#34;, 33)´
-        fields
-            A list of column names for the data. Ex: ´[&#34;id&#34;, &#34;FirstName&#34;, &#34;LastName&#34;, &#34;Age&#34;]´
-        table_name
-            The name of the table (in the database) that the data belongs to. Ex: &#34;people&#34;
-        id_field
-            The name of the column which stores the id. Ex: &#34;id&#34;. This can be set to ´None´ but needs to be provided when writing entries back into the database.
+    ----------
+    raw_table : list
+        A tuple with the data for the entry. Ex: ´(2, &#34;Tom&#34;, &#34;Builder&#34;, 33)´
+    fields : list
+        A list of column names for the data. Ex: ´[&#34;id&#34;, &#34;FirstName&#34;, &#34;LastName&#34;, &#34;Age&#34;]´
+    table_name: str
+        The name of the table (in the database) that the data belongs to. Ex: &#34;people&#34;
+    id_field: str
+        The name of the column which stores the id. Ex: &#34;id&#34;. This can be set to ´None´ but needs to be provided when writing entries back into the database.
     &#34;&#34;&#34;
 
     table = []
@@ -103,14 +102,16 @@ class QueryException(Exception):
 
 # TODO implement JOIN and LEFTJOIN (RIGHTJOIN?): https://www.w3schools.com/sql/sql_join.asp
 class Query:
-    &#34;&#34;&#34;A class for writing sql queries. Queries can be run on the attached database or a seperate one with the ´run´ method&#34;&#34;&#34;
+    &#34;&#34;&#34;
+    A class for writing sql queries. Queries can be run on the attached database or a seperate one with the ´run´ method
+
+    Parameters
+    ----------
+    db : Database, optional
+        The attached Database. This is the default database to run queries on.
+    &#34;&#34;&#34;
 
     def __init__(self, db=None) -&gt; None:
-        &#34;&#34;&#34;
-        Initialize query
-
-        :param db: The attached Database. This is the default database to run queries on.
-        &#34;&#34;&#34;
         
         self._db = db
         &#34;&#34;&#34;The attached Database&#34;&#34;&#34;
@@ -128,11 +129,7 @@ class Query:
         &#34;&#34;&#34;The table the sql query is interacting with&#34;&#34;&#34;
 
     def valid_prefixes(self, prefixes: list):
-        &#34;&#34;&#34;
-        Check if a statement is valid given its prefix
-
-        :param prefixs: A list of valid prefixes.
-        &#34;&#34;&#34;
+        &#34;&#34;&#34;Check if a statement is valid given its prefix&#34;&#34;&#34;
 
         prefix = None
         if len(self.history) &gt; 0:
@@ -145,7 +142,10 @@ class Query:
         &#34;&#34;&#34;
         Sql SELECT statement.
             
-        :param selection: Either a python list or sql list of table names.
+        Parameters
+        ----------
+        selection : str/list
+            Either a python list or sql list of table names.
         &#34;&#34;&#34;
         
         self.valid_prefixes([None])
@@ -168,7 +168,10 @@ class Query:
         &#34;&#34;&#34;
         Sql FROM statement. Has to be preceded by a SELECT statement.
 
-        :param table_name: Name of the table you are selecting from.
+        Parameters
+        ----------
+        table_name :
+            Name of the table you are selecting from.
         &#34;&#34;&#34;
 
         self.valid_prefixes([&#34;SELECT&#34;])
@@ -188,9 +191,12 @@ class Query:
         &#34;&#34;&#34;
         Sql WHERE statement.
 
-        :param col_name: The name of the column. You can also just pass it a statement like: ´&#34;id&#34; = 4´ instead of providing a value.
-        :param value: The value of the column.
-
+        Parameters
+        ----------
+        col_name : str
+            The name of the column. You can also just pass it a statement like: ´&#34;id&#34; = 4´ instead of providing a value.
+        value : optional
+            The value of the column.
         &#34;&#34;&#34;
 
         self.valid_prefixes([&#34;FROM&#34;, &#34;SET&#34;])
@@ -206,11 +212,14 @@ class Query:
                 self.col = col_name.replace(&#34; &#34;, &#34;&#34;)
         return(self)
 
-    def LIKE(self, pattern):
+    def LIKE(self, pattern: str):
         &#34;&#34;&#34;
         Sql WHERE statement. Has to be preceded by a WHERE statement.
 
-        :param pattern: A typical sql LIKE pattern with % and _.
+        Parameters
+        ----------
+        pattern : str
+            A typical sql LIKE pattern with % and _.
         &#34;&#34;&#34;
 
         self.valid_prefixes([&#34;WHERE&#34;])
@@ -222,7 +231,10 @@ class Query:
         &#34;&#34;&#34;
         Sql UPDATE statement.
 
-        :param table_name: Name of the table you are updating.
+        Parameters
+        ----------
+        table_name : str
+            Name of the table you are updating.
         &#34;&#34;&#34;
 
         self.valid_prefixes([None])
@@ -239,7 +251,10 @@ class Query:
         &#34;&#34;&#34;
         Sql SET statement. Must be preceded by an UPDATE statement.
 
-        :param data: A dictionaty with key and value pairs.
+        Parameters
+        ----------
+        data : dict
+            A dictionaty with key and value pairs.
         &#34;&#34;&#34;
 
         self.valid_prefixes([&#34;UPDATE&#34;])
@@ -252,11 +267,14 @@ class Query:
 
         return(self)
 
-    def INSERT_INTO(self, table_name):
+    def INSERT_INTO(self, table_name: str):
         &#34;&#34;&#34;
         Sql INSERT INTO statement.
 
-        :param table_name: Name of the table you want to insert into.
+        Parameters
+        ----------
+        table_name : str
+            Name of the table you want to insert into.
         &#34;&#34;&#34;
 
         self.valid_prefixes([None])
@@ -271,7 +289,10 @@ class Query:
         &#34;&#34;&#34;
         Sql VALUES statement. Must be preceded by INSERT_INTO statement.
 
-        :param data: Dictionary with key value pairs.
+        Parameters
+        ----------
+        data : dict
+            Dictionary with key value pairs.
         &#34;&#34;&#34;
 
         self.valid_prefixes([&#34;INSERT_INTO&#34;])
@@ -288,8 +309,12 @@ class Query:
         &#34;&#34;&#34;
         Execute the query in the attached database or in a seperate one. Returns the results in a table (list of DatabaseEntry) or ´None´ if no results.
 
-        :param db: The database to execute to query on.
-        :param raw: If True: returns the raw table (list of tuples) instead of the normal table.
+        Parameters
+        ----------
+        db : Database, optional
+            The database to execute to query on.
+        raw : bool, optional
+            If True: returns the raw table (list of tuples) instead of the normal table.
         &#34;&#34;&#34;
 
         
@@ -324,16 +349,22 @@ class Query:
 
 
 class DatabaseEntry(dict):
-    &#34;&#34;&#34;A python dictionary that keeps track of the table where it came from, and the name and value of its id field. This class is not supposed to be created manually&#34;&#34;&#34;
+    &#34;&#34;&#34;
+    A python dictionary that keeps track of the table where it came from, and the name and value of its id field. This class is not supposed to be created manually
+    
+    Constructs the entry by saving the table and id_field as attributes. The ´entry_dict´ is used to populate this object with data.
+
+    Parameters
+    ----------
+    entry_dict : dict
+        A dictionary containing all the information. This information can be accesed just like any other python dict with ´my_entry[my_key]´.
+    table : str
+        The name of the table the entry is a part of
+    id_field : str/None
+        The column name for the entry&#39;s id
+    &#34;&#34;&#34;
 
     def __init__(self, entry_dict: dict, table: str, id_field):
-        &#34;&#34;&#34;&#34;
-        Constructs the entry by saving the table and id_field as attributes. The ´entry_dict´ is used to populate this object with data.
-
-        :param id_field: The column name for the entry&#39;s id
-        :param table: The name of the table the entry is a part of
-        :param entry_dict: A dictionary containing all the information. This information can be accesed just like any other python dict with ´my_entry[my_key]´.
-        &#34;&#34;&#34;
 
         self.id_field = id_field
         self.table = table
@@ -350,10 +381,16 @@ class DatabaseEntry(dict):
         &#34;&#34;&#34;
         Alternative constructor for converting a raw entry to a DatabaseEntry.
         
-        :param raw_entry: A tuple with the data for the entry. Ex: ´(2, &#34;Tom&#34;, &#34;Builder&#34;, 33)´
-        :param table_fields: A list of column names for the data. Ex: ´[&#34;id&#34;, &#34;FirstName&#34;, &#34;LastName&#34;, &#34;Age&#34;]´
-        :param table_name: The name of the table (in the database) that the data belongs to. Ex: &#34;people&#34;
-        :param id_field: The name of the column which stores the id. Ex: &#34;id&#34;. This can be set to ´None´ but needs to be provided when writing this entry back into the database.
+        Parameters
+        ----------
+        raw_entry : tuple
+            A tuple with the data for the entry. Ex: ´(2, &#34;Tom&#34;, &#34;Builder&#34;, 33)´
+        table_fields : list
+            A list of column names for the data. Ex: ´[&#34;id&#34;, &#34;FirstName&#34;, &#34;LastName&#34;, &#34;Age&#34;]´
+        table_name : str
+            The name of the table (in the database) that the data belongs to. Ex: &#34;people&#34;
+        id_field : str/None
+            The name of the column which stores the id. Ex: &#34;id&#34;. This can be set to ´None´ but needs to be provided when writing this entry back into the database.
         &#34;&#34;&#34;
 
         entry_dict = {}
@@ -381,17 +418,22 @@ class DatabaseEntry(dict):
 # TODO implement export to csv
 # TODO implement import from csv
 class Database:
-    &#34;&#34;&#34;Main database class for manipulating sqlite3 databases&#34;&#34;&#34;
+    &#34;&#34;&#34;
+    Main database class for manipulating sqlite3 databases
+
+    Parameters
+    ----------
+    path : str
+        Path to the database file
+    new : bool, optional
+        A new blank database will be created where the ´self.path´ is pointing
+    default_id_field : str, optional
+        The default name for the id field in tables
+    silent : bool, optional
+        Disables all feedback in the form of prints 
+    &#34;&#34;&#34;
 
     def __init__(self, path: str, new = False, default_id_field=&#34;id&#34;, silent=False):
-        &#34;&#34;&#34;
-        Constructor for Database
-
-        :param path:               Path to the database file
-        :param new:                A new blank database will be created where the ´self.path´ is pointing
-        :param default_id_field:   The default name for the id field in tables
-        :param silent:             Disables all feedback in the form of prints 
-        &#34;&#34;&#34;
 
         if not new and not os.path.isfile(path):
             raise(DatabaseException(f&#34;no database file at \&#34;{path}\&#34;. If you want to create one, pass \&#34;new=True\&#34;&#34;))
@@ -426,7 +468,10 @@ class Database:
         &#34;&#34;&#34;
         Check if database has a table with a certain name.
         
-        :param table_name: Name to check.
+        Parameters
+        ----------
+        table_name : str
+            Name to check.
 
         &#34;&#34;&#34;
 
@@ -438,8 +483,12 @@ class Database:
         &#34;&#34;&#34;
         Returns all entries in a table as a list of tuples
         
-        :param name: Name of the table.
-        :param get_only: Can be set to a list of column/field names, to only retrieve those columns/fields.
+        Parameters
+        ----------
+        name : str
+            Name of the table.
+        get_only : list/None
+            Can be set to a list of column/field names, to only retrieve those columns/fields.
         &#34;&#34;&#34;
 
         selected = &#34;*&#34;
@@ -461,9 +510,15 @@ class Database:
         &#34;&#34;&#34;
         Returns all entries in a table as python dictionaries. This function loops over all entries in the table, so it is not the best in big databases.
 
-        :param name: Name of the table.
-        :param id_field: The id_field of the table. Will be set to the database default if not set.
-        :param get_only: Can be set to a list of column/field names, to only retrieve those columns/fields.
+        Parameters
+        ----------
+            Name of the table.
+        id_field : str, optional
+            The id_field of the table. Will be set to the database default if not set.
+        get_only : list/None, optional
+            Can be set to a list of column/field names, to only retrieve those columns/fields.
+        silent : bool, optional
+            Disables prints if True
         &#34;&#34;&#34;
 
         if id_field == &#34;&#34;:
@@ -480,7 +535,10 @@ class Database:
         &#34;&#34;&#34;
         Returns sql information about a table (runs ´PRAGMA TABLE_INFO(name)´).
 
-        :param name: Name of the table.
+        Parameters 
+        -----------
+        name : str
+            Name of the table.
         &#34;&#34;&#34;
 
         self.cursor.execute(f&#34;PRAGMA table_info({name});&#34;)
@@ -490,9 +548,14 @@ class Database:
         &#34;&#34;&#34;
         Prints a pretty table (with a name).
 
-        :param name: Name of the table.
-        :param max_len: The max number of rows shown.
-        :param get_only: If given a list of column/field names: only shows those
+        Parameters
+        ----------
+        name : str
+            Name of the table.
+        max_len : int, optional
+            The max number of rows shown.
+        get_only : list/None, optional
+            If given a list of column/field names: only shows those
                 
         &#34;&#34;&#34;
         
@@ -565,7 +628,10 @@ class Database:
         &#34;&#34;&#34;
         Returns the column names for a given table
         
-        :param name: Name of the table.
+        Parameters
+        ----------
+        name : str
+            Name of the table.
 
         &#34;&#34;&#34;
 
@@ -576,28 +642,36 @@ class Database:
         return(keys)
 
     def fill_null(self, entry: DatabaseEntry):
-            &#34;&#34;&#34;
-            Fills out any unpopulated fields in a DatabaseEntry (fields that exist in the database but not in the entry).
+        &#34;&#34;&#34;
+        Fills out any unpopulated fields in a DatabaseEntry (fields that exist in the database but not in the entry).
 
-            :param entry: The DatabaseEntry.
-            &#34;&#34;&#34;
+        Parameters
+        ----------
+        entry : DatabaseEntry
+            The DatabaseEntry.
+        &#34;&#34;&#34;
 
-            t_fields = self.get_table_columns(entry.table)
-            e_fields = list(entry)
-            for f in e_fields:
-                t_fields.remove(f)
-            for null_field in t_fields:
-                entry[null_field] = None
-            return(entry)
+        t_fields = self.get_table_columns(entry.table)
+        e_fields = list(entry)
+        for f in e_fields:
+            t_fields.remove(f)
+        for null_field in t_fields:
+            entry[null_field] = None
+        return(entry)
 
 
     def get_entry_by_id(self, table, ID, id_field=None):
         &#34;&#34;&#34;
         Get table entry by id.
 
-        :param table: Name of the table.
-        :param ID: The entry id.
-        :param id_field: The field that holds the id value. Will use default if not set.
+        Parameters
+        ----------
+        table : str
+            Name of the table.
+        ID :  
+            The entry id.
+        id_field : str/None, optional
+            The field that holds the id value. Will use default if not set.
         &#34;&#34;&#34;
 
         if not id_field:
@@ -628,9 +702,14 @@ class Database:
         &#34;&#34;&#34;
         Add an entry to the database. The entry must have values for all fields in the table. You can pass ´fill_null=True´ to fill remaining fields with None/null. Use ´silent=True´ to suppress warnings and messages.
 
-        :param entry: The entry. The entry must NOT have an id_field (it has to be ´None´: ´entry.id_field = None´).
-        :param fill_null: Fill in unpopulated fields with null values.
-        :param silent: If True: disables prints.
+        Parameters
+        ---------------------
+        entry : DatabaseEntry
+            The entry. The entry must NOT have an id_field (it has to be ´None´: ´entry.id_field = None´).
+        fill_null : bool, optional
+            Fill in unpopulated fields with null values.
+        silent : bool, optional
+            If True: disables prints.
         &#34;&#34;&#34;
 
         if entry.id_field:
@@ -676,12 +755,20 @@ class Database:
         &#34;&#34;&#34;
         Update entry in database with a DatabaseEntry, or with a dictionary + the name of the table you want to update.
 
-        :param entry: DatabaseEntry or dictionary, if dictionary you also need to provide table and id_field.
-        :param table: The table name.
-        :param id_field: The field that holds the entry id.
-        :param part: If True: Only updates the provided fields.
-        :param fill_null: Fill in unpopulated fields with null values.
-        :param silent: If True: disables prints.
+        Parameters
+        ----------
+        entry : DatabaseEntry/dict
+            DatabaseEntry or dictionary, if dictionary you also need to provide table and id_field.
+        table : str, optional
+            The table name.
+        id_field : str/None, optional
+            The field that holds the entry id.
+        part : bool, optional
+            If True: Only updates the provided fields.
+        fill_null : bool, optional
+            Fill in unpopulated fields with null values.
+        silent : bool, optional
+            If True: disables prints.
 
         &#34;&#34;&#34;
 
@@ -751,7 +838,10 @@ class Database:
         &#34;&#34;&#34;
         Start sql SELECT query from the database. Returns a Query to build from.
 
-        :param pattern: Either a python list or sql list of table names.
+        Parameters
+        ----------
+        pattern : str, optional
+            Either a python list or sql list of table names.
         &#34;&#34;&#34;
 
         return(Query(db=self).SELECT(pattern))
@@ -760,7 +850,10 @@ class Database:
         &#34;&#34;&#34;
         Start sql UPDATE query from the database. Returns a Query to build from.
 
-        :param table_name: Name of the table.
+        Parameters
+        ----------
+        table_name : str
+            Name of the table.
         &#34;&#34;&#34;
         return(Query(db=self).UPDATE(table_name))
 
@@ -768,7 +861,10 @@ class Database:
         &#34;&#34;&#34;
         Start sql INSERT INTO query from the database. Returns a Query to build from.
 
-        :param table_name: Name of the table.
+        Parameters
+        ----------
+        table_name : str
+            Name of the table.
         &#34;&#34;&#34;
 
         return(Query(db=self).INSERT_INTO(table_name))
@@ -817,15 +913,17 @@ class Database:
 </code></dt>
 <dd>
 <div class="desc"><p>Convert a raw table (list of tuples) to a table (table of dictionaries)</p>
-<p>Parameters
-raw_entry
-A tuple with the data for the entry. Ex: ´(2, "Tom", "Builder", 33)´
-fields
-A list of column names for the data. Ex: ´["id", "FirstName", "LastName", "Age"]´
-table_name
-The name of the table (in the database) that the data belongs to. Ex: "people"
-id_field
-The name of the column which stores the id. Ex: "id". This can be set to ´None´ but needs to be provided when writing entries back into the database.</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>raw_table</code></strong> :&ensp;<code>list</code></dt>
+<dd>A tuple with the data for the entry. Ex: ´(2, "Tom", "Builder", 33)´</dd>
+<dt><strong><code>fields</code></strong> :&ensp;<code>list</code></dt>
+<dd>A list of column names for the data. Ex: ´["id", "FirstName", "LastName", "Age"]´</dd>
+<dt><strong><code>table_name</code></strong> :&ensp;<code>str</code></dt>
+<dd>The name of the table (in the database) that the data belongs to. Ex: "people"</dd>
+<dt><strong><code>id_field</code></strong> :&ensp;<code>str</code></dt>
+<dd>The name of the column which stores the id. Ex: "id". This can be set to ´None´ but needs to be provided when writing entries back into the database.</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -835,14 +933,15 @@ The name of the column which stores the id. Ex: "id". This can be set to ´None�
     Convert a raw table (list of tuples) to a table (table of dictionaries)
 
     Parameters
-        raw_entry
-            A tuple with the data for the entry. Ex: ´(2, &#34;Tom&#34;, &#34;Builder&#34;, 33)´
-        fields
-            A list of column names for the data. Ex: ´[&#34;id&#34;, &#34;FirstName&#34;, &#34;LastName&#34;, &#34;Age&#34;]´
-        table_name
-            The name of the table (in the database) that the data belongs to. Ex: &#34;people&#34;
-        id_field
-            The name of the column which stores the id. Ex: &#34;id&#34;. This can be set to ´None´ but needs to be provided when writing entries back into the database.
+    ----------
+    raw_table : list
+        A tuple with the data for the entry. Ex: ´(2, &#34;Tom&#34;, &#34;Builder&#34;, 33)´
+    fields : list
+        A list of column names for the data. Ex: ´[&#34;id&#34;, &#34;FirstName&#34;, &#34;LastName&#34;, &#34;Age&#34;]´
+    table_name: str
+        The name of the table (in the database) that the data belongs to. Ex: &#34;people&#34;
+    id_field: str
+        The name of the column which stores the id. Ex: &#34;id&#34;. This can be set to ´None´ but needs to be provided when writing entries back into the database.
     &#34;&#34;&#34;
 
     table = []
@@ -915,31 +1014,38 @@ The name of the column which stores the id. Ex: "id". This can be set to ´None�
 </code></dt>
 <dd>
 <div class="desc"><p>Main database class for manipulating sqlite3 databases</p>
-<p>Constructor for Database</p>
-<p>:param path:
-Path to the database file
-:param new:
-A new blank database will be created where the ´self.path´ is pointing
-:param default_id_field:
-The default name for the id field in tables
-:param silent:
-Disables all feedback in the form of prints</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>path</code></strong> :&ensp;<code>str</code></dt>
+<dd>Path to the database file</dd>
+<dt><strong><code>new</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>A new blank database will be created where the ´self.path´ is pointing</dd>
+<dt><strong><code>default_id_field</code></strong> :&ensp;<code>str</code>, optional</dt>
+<dd>The default name for the id field in tables</dd>
+<dt><strong><code>silent</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>Disables all feedback in the form of prints</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class Database:
-    &#34;&#34;&#34;Main database class for manipulating sqlite3 databases&#34;&#34;&#34;
+    &#34;&#34;&#34;
+    Main database class for manipulating sqlite3 databases
+
+    Parameters
+    ----------
+    path : str
+        Path to the database file
+    new : bool, optional
+        A new blank database will be created where the ´self.path´ is pointing
+    default_id_field : str, optional
+        The default name for the id field in tables
+    silent : bool, optional
+        Disables all feedback in the form of prints 
+    &#34;&#34;&#34;
 
     def __init__(self, path: str, new = False, default_id_field=&#34;id&#34;, silent=False):
-        &#34;&#34;&#34;
-        Constructor for Database
-
-        :param path:               Path to the database file
-        :param new:                A new blank database will be created where the ´self.path´ is pointing
-        :param default_id_field:   The default name for the id field in tables
-        :param silent:             Disables all feedback in the form of prints 
-        &#34;&#34;&#34;
 
         if not new and not os.path.isfile(path):
             raise(DatabaseException(f&#34;no database file at \&#34;{path}\&#34;. If you want to create one, pass \&#34;new=True\&#34;&#34;))
@@ -974,7 +1080,10 @@ Disables all feedback in the form of prints</p></div>
         &#34;&#34;&#34;
         Check if database has a table with a certain name.
         
-        :param table_name: Name to check.
+        Parameters
+        ----------
+        table_name : str
+            Name to check.
 
         &#34;&#34;&#34;
 
@@ -986,8 +1095,12 @@ Disables all feedback in the form of prints</p></div>
         &#34;&#34;&#34;
         Returns all entries in a table as a list of tuples
         
-        :param name: Name of the table.
-        :param get_only: Can be set to a list of column/field names, to only retrieve those columns/fields.
+        Parameters
+        ----------
+        name : str
+            Name of the table.
+        get_only : list/None
+            Can be set to a list of column/field names, to only retrieve those columns/fields.
         &#34;&#34;&#34;
 
         selected = &#34;*&#34;
@@ -1009,9 +1122,15 @@ Disables all feedback in the form of prints</p></div>
         &#34;&#34;&#34;
         Returns all entries in a table as python dictionaries. This function loops over all entries in the table, so it is not the best in big databases.
 
-        :param name: Name of the table.
-        :param id_field: The id_field of the table. Will be set to the database default if not set.
-        :param get_only: Can be set to a list of column/field names, to only retrieve those columns/fields.
+        Parameters
+        ----------
+            Name of the table.
+        id_field : str, optional
+            The id_field of the table. Will be set to the database default if not set.
+        get_only : list/None, optional
+            Can be set to a list of column/field names, to only retrieve those columns/fields.
+        silent : bool, optional
+            Disables prints if True
         &#34;&#34;&#34;
 
         if id_field == &#34;&#34;:
@@ -1028,7 +1147,10 @@ Disables all feedback in the form of prints</p></div>
         &#34;&#34;&#34;
         Returns sql information about a table (runs ´PRAGMA TABLE_INFO(name)´).
 
-        :param name: Name of the table.
+        Parameters 
+        -----------
+        name : str
+            Name of the table.
         &#34;&#34;&#34;
 
         self.cursor.execute(f&#34;PRAGMA table_info({name});&#34;)
@@ -1038,9 +1160,14 @@ Disables all feedback in the form of prints</p></div>
         &#34;&#34;&#34;
         Prints a pretty table (with a name).
 
-        :param name: Name of the table.
-        :param max_len: The max number of rows shown.
-        :param get_only: If given a list of column/field names: only shows those
+        Parameters
+        ----------
+        name : str
+            Name of the table.
+        max_len : int, optional
+            The max number of rows shown.
+        get_only : list/None, optional
+            If given a list of column/field names: only shows those
                 
         &#34;&#34;&#34;
         
@@ -1113,7 +1240,10 @@ Disables all feedback in the form of prints</p></div>
         &#34;&#34;&#34;
         Returns the column names for a given table
         
-        :param name: Name of the table.
+        Parameters
+        ----------
+        name : str
+            Name of the table.
 
         &#34;&#34;&#34;
 
@@ -1124,28 +1254,36 @@ Disables all feedback in the form of prints</p></div>
         return(keys)
 
     def fill_null(self, entry: DatabaseEntry):
-            &#34;&#34;&#34;
-            Fills out any unpopulated fields in a DatabaseEntry (fields that exist in the database but not in the entry).
+        &#34;&#34;&#34;
+        Fills out any unpopulated fields in a DatabaseEntry (fields that exist in the database but not in the entry).
 
-            :param entry: The DatabaseEntry.
-            &#34;&#34;&#34;
+        Parameters
+        ----------
+        entry : DatabaseEntry
+            The DatabaseEntry.
+        &#34;&#34;&#34;
 
-            t_fields = self.get_table_columns(entry.table)
-            e_fields = list(entry)
-            for f in e_fields:
-                t_fields.remove(f)
-            for null_field in t_fields:
-                entry[null_field] = None
-            return(entry)
+        t_fields = self.get_table_columns(entry.table)
+        e_fields = list(entry)
+        for f in e_fields:
+            t_fields.remove(f)
+        for null_field in t_fields:
+            entry[null_field] = None
+        return(entry)
 
 
     def get_entry_by_id(self, table, ID, id_field=None):
         &#34;&#34;&#34;
         Get table entry by id.
 
-        :param table: Name of the table.
-        :param ID: The entry id.
-        :param id_field: The field that holds the id value. Will use default if not set.
+        Parameters
+        ----------
+        table : str
+            Name of the table.
+        ID :  
+            The entry id.
+        id_field : str/None, optional
+            The field that holds the id value. Will use default if not set.
         &#34;&#34;&#34;
 
         if not id_field:
@@ -1176,9 +1314,14 @@ Disables all feedback in the form of prints</p></div>
         &#34;&#34;&#34;
         Add an entry to the database. The entry must have values for all fields in the table. You can pass ´fill_null=True´ to fill remaining fields with None/null. Use ´silent=True´ to suppress warnings and messages.
 
-        :param entry: The entry. The entry must NOT have an id_field (it has to be ´None´: ´entry.id_field = None´).
-        :param fill_null: Fill in unpopulated fields with null values.
-        :param silent: If True: disables prints.
+        Parameters
+        ---------------------
+        entry : DatabaseEntry
+            The entry. The entry must NOT have an id_field (it has to be ´None´: ´entry.id_field = None´).
+        fill_null : bool, optional
+            Fill in unpopulated fields with null values.
+        silent : bool, optional
+            If True: disables prints.
         &#34;&#34;&#34;
 
         if entry.id_field:
@@ -1224,12 +1367,20 @@ Disables all feedback in the form of prints</p></div>
         &#34;&#34;&#34;
         Update entry in database with a DatabaseEntry, or with a dictionary + the name of the table you want to update.
 
-        :param entry: DatabaseEntry or dictionary, if dictionary you also need to provide table and id_field.
-        :param table: The table name.
-        :param id_field: The field that holds the entry id.
-        :param part: If True: Only updates the provided fields.
-        :param fill_null: Fill in unpopulated fields with null values.
-        :param silent: If True: disables prints.
+        Parameters
+        ----------
+        entry : DatabaseEntry/dict
+            DatabaseEntry or dictionary, if dictionary you also need to provide table and id_field.
+        table : str, optional
+            The table name.
+        id_field : str/None, optional
+            The field that holds the entry id.
+        part : bool, optional
+            If True: Only updates the provided fields.
+        fill_null : bool, optional
+            Fill in unpopulated fields with null values.
+        silent : bool, optional
+            If True: disables prints.
 
         &#34;&#34;&#34;
 
@@ -1299,7 +1450,10 @@ Disables all feedback in the form of prints</p></div>
         &#34;&#34;&#34;
         Start sql SELECT query from the database. Returns a Query to build from.
 
-        :param pattern: Either a python list or sql list of table names.
+        Parameters
+        ----------
+        pattern : str, optional
+            Either a python list or sql list of table names.
         &#34;&#34;&#34;
 
         return(Query(db=self).SELECT(pattern))
@@ -1308,7 +1462,10 @@ Disables all feedback in the form of prints</p></div>
         &#34;&#34;&#34;
         Start sql UPDATE query from the database. Returns a Query to build from.
 
-        :param table_name: Name of the table.
+        Parameters
+        ----------
+        table_name : str
+            Name of the table.
         &#34;&#34;&#34;
         return(Query(db=self).UPDATE(table_name))
 
@@ -1316,7 +1473,10 @@ Disables all feedback in the form of prints</p></div>
         &#34;&#34;&#34;
         Start sql INSERT INTO query from the database. Returns a Query to build from.
 
-        :param table_name: Name of the table.
+        Parameters
+        ----------
+        table_name : str
+            Name of the table.
         &#34;&#34;&#34;
 
         return(Query(db=self).INSERT_INTO(table_name))
@@ -1364,7 +1524,11 @@ Disables all feedback in the form of prints</p></div>
 </code></dt>
 <dd>
 <div class="desc"><p>Start sql INSERT INTO query from the database. Returns a Query to build from.</p>
-<p>:param table_name: Name of the table.</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>table_name</code></strong> :&ensp;<code>str</code></dt>
+<dd>Name of the table.</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1373,7 +1537,10 @@ Disables all feedback in the form of prints</p></div>
     &#34;&#34;&#34;
     Start sql INSERT INTO query from the database. Returns a Query to build from.
 
-    :param table_name: Name of the table.
+    Parameters
+    ----------
+    table_name : str
+        Name of the table.
     &#34;&#34;&#34;
 
     return(Query(db=self).INSERT_INTO(table_name))</code></pre>
@@ -1384,7 +1551,11 @@ Disables all feedback in the form of prints</p></div>
 </code></dt>
 <dd>
 <div class="desc"><p>Start sql SELECT query from the database. Returns a Query to build from.</p>
-<p>:param pattern: Either a python list or sql list of table names.</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>pattern</code></strong> :&ensp;<code>str</code>, optional</dt>
+<dd>Either a python list or sql list of table names.</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1393,7 +1564,10 @@ Disables all feedback in the form of prints</p></div>
     &#34;&#34;&#34;
     Start sql SELECT query from the database. Returns a Query to build from.
 
-    :param pattern: Either a python list or sql list of table names.
+    Parameters
+    ----------
+    pattern : str, optional
+        Either a python list or sql list of table names.
     &#34;&#34;&#34;
 
     return(Query(db=self).SELECT(pattern))</code></pre>
@@ -1404,7 +1578,11 @@ Disables all feedback in the form of prints</p></div>
 </code></dt>
 <dd>
 <div class="desc"><p>Start sql UPDATE query from the database. Returns a Query to build from.</p>
-<p>:param table_name: Name of the table.</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>table_name</code></strong> :&ensp;<code>str</code></dt>
+<dd>Name of the table.</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1413,7 +1591,10 @@ Disables all feedback in the form of prints</p></div>
     &#34;&#34;&#34;
     Start sql UPDATE query from the database. Returns a Query to build from.
 
-    :param table_name: Name of the table.
+    Parameters
+    ----------
+    table_name : str
+        Name of the table.
     &#34;&#34;&#34;
     return(Query(db=self).UPDATE(table_name))</code></pre>
 </details>
@@ -1423,9 +1604,15 @@ Disables all feedback in the form of prints</p></div>
 </code></dt>
 <dd>
 <div class="desc"><p>Add an entry to the database. The entry must have values for all fields in the table. You can pass ´fill_null=True´ to fill remaining fields with None/null. Use ´silent=True´ to suppress warnings and messages.</p>
-<p>:param entry: The entry. The entry must NOT have an id_field (it has to be ´None´: ´entry.id_field = None´).
-:param fill_null: Fill in unpopulated fields with null values.
-:param silent: If True: disables prints.</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>entry</code></strong> :&ensp;<code><a title="sqlite_integrated.DatabaseEntry" href="#sqlite_integrated.DatabaseEntry">DatabaseEntry</a></code></dt>
+<dd>The entry. The entry must NOT have an id_field (it has to be ´None´: ´entry.id_field = None´).</dd>
+<dt><strong><code>fill_null</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>Fill in unpopulated fields with null values.</dd>
+<dt><strong><code>silent</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>If True: disables prints.</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1434,9 +1621,14 @@ Disables all feedback in the form of prints</p></div>
     &#34;&#34;&#34;
     Add an entry to the database. The entry must have values for all fields in the table. You can pass ´fill_null=True´ to fill remaining fields with None/null. Use ´silent=True´ to suppress warnings and messages.
 
-    :param entry: The entry. The entry must NOT have an id_field (it has to be ´None´: ´entry.id_field = None´).
-    :param fill_null: Fill in unpopulated fields with null values.
-    :param silent: If True: disables prints.
+    Parameters
+    ---------------------
+    entry : DatabaseEntry
+        The entry. The entry must NOT have an id_field (it has to be ´None´: ´entry.id_field = None´).
+    fill_null : bool, optional
+        Fill in unpopulated fields with null values.
+    silent : bool, optional
+        If True: disables prints.
     &#34;&#34;&#34;
 
     if entry.id_field:
@@ -1499,25 +1691,32 @@ Disables all feedback in the form of prints</p></div>
 </code></dt>
 <dd>
 <div class="desc"><p>Fills out any unpopulated fields in a DatabaseEntry (fields that exist in the database but not in the entry).</p>
-<p>:param entry: The DatabaseEntry.</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>entry</code></strong> :&ensp;<code><a title="sqlite_integrated.DatabaseEntry" href="#sqlite_integrated.DatabaseEntry">DatabaseEntry</a></code></dt>
+<dd>The DatabaseEntry.</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def fill_null(self, entry: DatabaseEntry):
-        &#34;&#34;&#34;
-        Fills out any unpopulated fields in a DatabaseEntry (fields that exist in the database but not in the entry).
+    &#34;&#34;&#34;
+    Fills out any unpopulated fields in a DatabaseEntry (fields that exist in the database but not in the entry).
 
-        :param entry: The DatabaseEntry.
-        &#34;&#34;&#34;
+    Parameters
+    ----------
+    entry : DatabaseEntry
+        The DatabaseEntry.
+    &#34;&#34;&#34;
 
-        t_fields = self.get_table_columns(entry.table)
-        e_fields = list(entry)
-        for f in e_fields:
-            t_fields.remove(f)
-        for null_field in t_fields:
-            entry[null_field] = None
-        return(entry)</code></pre>
+    t_fields = self.get_table_columns(entry.table)
+    e_fields = list(entry)
+    for f in e_fields:
+        t_fields.remove(f)
+    for null_field in t_fields:
+        entry[null_field] = None
+    return(entry)</code></pre>
 </details>
 </dd>
 <dt id="sqlite_integrated.Database.get_entry_by_id"><code class="name flex">
@@ -1525,9 +1724,15 @@ Disables all feedback in the form of prints</p></div>
 </code></dt>
 <dd>
 <div class="desc"><p>Get table entry by id.</p>
-<p>:param table: Name of the table.
-:param ID: The entry id.
-:param id_field: The field that holds the id value. Will use default if not set.</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>table</code></strong> :&ensp;<code>str</code></dt>
+<dd>Name of the table.</dd>
+<dt><strong><code>ID</code></strong> :&ensp;<code> </code></dt>
+<dd>The entry id.</dd>
+<dt><strong><code>id_field</code></strong> :&ensp;<code>str/None</code>, optional</dt>
+<dd>The field that holds the id value. Will use default if not set.</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1536,9 +1741,14 @@ Disables all feedback in the form of prints</p></div>
     &#34;&#34;&#34;
     Get table entry by id.
 
-    :param table: Name of the table.
-    :param ID: The entry id.
-    :param id_field: The field that holds the id value. Will use default if not set.
+    Parameters
+    ----------
+    table : str
+        Name of the table.
+    ID :  
+        The entry id.
+    id_field : str/None, optional
+        The field that holds the id value. Will use default if not set.
     &#34;&#34;&#34;
 
     if not id_field:
@@ -1570,9 +1780,17 @@ Disables all feedback in the form of prints</p></div>
 </code></dt>
 <dd>
 <div class="desc"><p>Returns all entries in a table as python dictionaries. This function loops over all entries in the table, so it is not the best in big databases.</p>
-<p>:param name: Name of the table.
-:param id_field: The id_field of the table. Will be set to the database default if not set.
-:param get_only: Can be set to a list of column/field names, to only retrieve those columns/fields.</p></div>
+<h2 id="parameters">Parameters</h2>
+<pre><code>Name of the table.
+</code></pre>
+<dl>
+<dt><strong><code>id_field</code></strong> :&ensp;<code>str</code>, optional</dt>
+<dd>The id_field of the table. Will be set to the database default if not set.</dd>
+<dt><strong><code>get_only</code></strong> :&ensp;<code>list/None</code>, optional</dt>
+<dd>Can be set to a list of column/field names, to only retrieve those columns/fields.</dd>
+<dt><strong><code>silent</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>Disables prints if True</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1581,9 +1799,15 @@ Disables all feedback in the form of prints</p></div>
     &#34;&#34;&#34;
     Returns all entries in a table as python dictionaries. This function loops over all entries in the table, so it is not the best in big databases.
 
-    :param name: Name of the table.
-    :param id_field: The id_field of the table. Will be set to the database default if not set.
-    :param get_only: Can be set to a list of column/field names, to only retrieve those columns/fields.
+    Parameters
+    ----------
+        Name of the table.
+    id_field : str, optional
+        The id_field of the table. Will be set to the database default if not set.
+    get_only : list/None, optional
+        Can be set to a list of column/field names, to only retrieve those columns/fields.
+    silent : bool, optional
+        Disables prints if True
     &#34;&#34;&#34;
 
     if id_field == &#34;&#34;:
@@ -1601,7 +1825,11 @@ Disables all feedback in the form of prints</p></div>
 </code></dt>
 <dd>
 <div class="desc"><p>Returns the column names for a given table</p>
-<p>:param name: Name of the table.</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>name</code></strong> :&ensp;<code>str</code></dt>
+<dd>Name of the table.</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1610,7 +1838,10 @@ Disables all feedback in the form of prints</p></div>
     &#34;&#34;&#34;
     Returns the column names for a given table
     
-    :param name: Name of the table.
+    Parameters
+    ----------
+    name : str
+        Name of the table.
 
     &#34;&#34;&#34;
 
@@ -1626,7 +1857,9 @@ Disables all feedback in the form of prints</p></div>
 </code></dt>
 <dd>
 <div class="desc"><p>Returns sql information about a table (runs ´PRAGMA TABLE_INFO(name)´).</p>
-<p>:param name: Name of the table.</p></div>
+<h2 id="parameters">Parameters</h2>
+<p>name : str
+Name of the table.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1635,7 +1868,10 @@ Disables all feedback in the form of prints</p></div>
     &#34;&#34;&#34;
     Returns sql information about a table (runs ´PRAGMA TABLE_INFO(name)´).
 
-    :param name: Name of the table.
+    Parameters 
+    -----------
+    name : str
+        Name of the table.
     &#34;&#34;&#34;
 
     self.cursor.execute(f&#34;PRAGMA table_info({name});&#34;)
@@ -1666,8 +1902,13 @@ Disables all feedback in the form of prints</p></div>
 </code></dt>
 <dd>
 <div class="desc"><p>Returns all entries in a table as a list of tuples</p>
-<p>:param name: Name of the table.
-:param get_only: Can be set to a list of column/field names, to only retrieve those columns/fields.</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>name</code></strong> :&ensp;<code>str</code></dt>
+<dd>Name of the table.</dd>
+<dt><strong><code>get_only</code></strong> :&ensp;<code>list/None</code></dt>
+<dd>Can be set to a list of column/field names, to only retrieve those columns/fields.</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1676,8 +1917,12 @@ Disables all feedback in the form of prints</p></div>
     &#34;&#34;&#34;
     Returns all entries in a table as a list of tuples
     
-    :param name: Name of the table.
-    :param get_only: Can be set to a list of column/field names, to only retrieve those columns/fields.
+    Parameters
+    ----------
+    name : str
+        Name of the table.
+    get_only : list/None
+        Can be set to a list of column/field names, to only retrieve those columns/fields.
     &#34;&#34;&#34;
 
     selected = &#34;*&#34;
@@ -1701,7 +1946,11 @@ Disables all feedback in the form of prints</p></div>
 </code></dt>
 <dd>
 <div class="desc"><p>Check if database has a table with a certain name.</p>
-<p>:param table_name: Name to check.</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>table_name</code></strong> :&ensp;<code>str</code></dt>
+<dd>Name to check.</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1710,7 +1959,10 @@ Disables all feedback in the form of prints</p></div>
     &#34;&#34;&#34;
     Check if database has a table with a certain name.
     
-    :param table_name: Name to check.
+    Parameters
+    ----------
+    table_name : str
+        Name to check.
 
     &#34;&#34;&#34;
 
@@ -1775,9 +2027,15 @@ Disables all feedback in the form of prints</p></div>
 </code></dt>
 <dd>
 <div class="desc"><p>Prints a pretty table (with a name).</p>
-<p>:param name: Name of the table.
-:param max_len: The max number of rows shown.
-:param get_only: If given a list of column/field names: only shows those</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>name</code></strong> :&ensp;<code>str</code></dt>
+<dd>Name of the table.</dd>
+<dt><strong><code>max_len</code></strong> :&ensp;<code>int</code>, optional</dt>
+<dd>The max number of rows shown.</dd>
+<dt><strong><code>get_only</code></strong> :&ensp;<code>list/None</code>, optional</dt>
+<dd>If given a list of column/field names: only shows those</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1786,9 +2044,14 @@ Disables all feedback in the form of prints</p></div>
     &#34;&#34;&#34;
     Prints a pretty table (with a name).
 
-    :param name: Name of the table.
-    :param max_len: The max number of rows shown.
-    :param get_only: If given a list of column/field names: only shows those
+    Parameters
+    ----------
+    name : str
+        Name of the table.
+    max_len : int, optional
+        The max number of rows shown.
+    get_only : list/None, optional
+        If given a list of column/field names: only shows those
             
     &#34;&#34;&#34;
     
@@ -1852,12 +2115,21 @@ Disables all feedback in the form of prints</p></div>
 </code></dt>
 <dd>
 <div class="desc"><p>Update entry in database with a DatabaseEntry, or with a dictionary + the name of the table you want to update.</p>
-<p>:param entry: DatabaseEntry or dictionary, if dictionary you also need to provide table and id_field.
-:param table: The table name.
-:param id_field: The field that holds the entry id.
-:param part: If True: Only updates the provided fields.
-:param fill_null: Fill in unpopulated fields with null values.
-:param silent: If True: disables prints.</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>entry</code></strong> :&ensp;<code>DatabaseEntry/dict</code></dt>
+<dd>DatabaseEntry or dictionary, if dictionary you also need to provide table and id_field.</dd>
+<dt><strong><code>table</code></strong> :&ensp;<code>str</code>, optional</dt>
+<dd>The table name.</dd>
+<dt><strong><code>id_field</code></strong> :&ensp;<code>str/None</code>, optional</dt>
+<dd>The field that holds the entry id.</dd>
+<dt><strong><code>part</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>If True: Only updates the provided fields.</dd>
+<dt><strong><code>fill_null</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>Fill in unpopulated fields with null values.</dd>
+<dt><strong><code>silent</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>If True: disables prints.</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1866,12 +2138,20 @@ Disables all feedback in the form of prints</p></div>
     &#34;&#34;&#34;
     Update entry in database with a DatabaseEntry, or with a dictionary + the name of the table you want to update.
 
-    :param entry: DatabaseEntry or dictionary, if dictionary you also need to provide table and id_field.
-    :param table: The table name.
-    :param id_field: The field that holds the entry id.
-    :param part: If True: Only updates the provided fields.
-    :param fill_null: Fill in unpopulated fields with null values.
-    :param silent: If True: disables prints.
+    Parameters
+    ----------
+    entry : DatabaseEntry/dict
+        DatabaseEntry or dictionary, if dictionary you also need to provide table and id_field.
+    table : str, optional
+        The table name.
+    id_field : str/None, optional
+        The field that holds the entry id.
+    part : bool, optional
+        If True: Only updates the provided fields.
+    fill_null : bool, optional
+        Fill in unpopulated fields with null values.
+    silent : bool, optional
+        If True: disables prints.
 
     &#34;&#34;&#34;
 
@@ -1928,26 +2208,37 @@ Disables all feedback in the form of prints</p></div>
 </code></dt>
 <dd>
 <div class="desc"><p>A python dictionary that keeps track of the table where it came from, and the name and value of its id field. This class is not supposed to be created manually</p>
-<p>"
-Constructs the entry by saving the table and id_field as attributes. The ´entry_dict´ is used to populate this object with data.</p>
-<p>:param id_field: The column name for the entry's id
-:param table: The name of the table the entry is a part of
-:param entry_dict: A dictionary containing all the information. This information can be accesed just like any other python dict with ´my_entry[my_key]´.</p></div>
+<p>Constructs the entry by saving the table and id_field as attributes. The ´entry_dict´ is used to populate this object with data.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>entry_dict</code></strong> :&ensp;<code>dict</code></dt>
+<dd>A dictionary containing all the information. This information can be accesed just like any other python dict with ´my_entry[my_key]´.</dd>
+<dt><strong><code>table</code></strong> :&ensp;<code>str</code></dt>
+<dd>The name of the table the entry is a part of</dd>
+<dt><strong><code>id_field</code></strong> :&ensp;<code>str/None</code></dt>
+<dd>The column name for the entry's id</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class DatabaseEntry(dict):
-    &#34;&#34;&#34;A python dictionary that keeps track of the table where it came from, and the name and value of its id field. This class is not supposed to be created manually&#34;&#34;&#34;
+    &#34;&#34;&#34;
+    A python dictionary that keeps track of the table where it came from, and the name and value of its id field. This class is not supposed to be created manually
+    
+    Constructs the entry by saving the table and id_field as attributes. The ´entry_dict´ is used to populate this object with data.
+
+    Parameters
+    ----------
+    entry_dict : dict
+        A dictionary containing all the information. This information can be accesed just like any other python dict with ´my_entry[my_key]´.
+    table : str
+        The name of the table the entry is a part of
+    id_field : str/None
+        The column name for the entry&#39;s id
+    &#34;&#34;&#34;
 
     def __init__(self, entry_dict: dict, table: str, id_field):
-        &#34;&#34;&#34;&#34;
-        Constructs the entry by saving the table and id_field as attributes. The ´entry_dict´ is used to populate this object with data.
-
-        :param id_field: The column name for the entry&#39;s id
-        :param table: The name of the table the entry is a part of
-        :param entry_dict: A dictionary containing all the information. This information can be accesed just like any other python dict with ´my_entry[my_key]´.
-        &#34;&#34;&#34;
 
         self.id_field = id_field
         self.table = table
@@ -1964,10 +2255,16 @@ Constructs the entry by saving the table and id_field as attributes. The ´entry
         &#34;&#34;&#34;
         Alternative constructor for converting a raw entry to a DatabaseEntry.
         
-        :param raw_entry: A tuple with the data for the entry. Ex: ´(2, &#34;Tom&#34;, &#34;Builder&#34;, 33)´
-        :param table_fields: A list of column names for the data. Ex: ´[&#34;id&#34;, &#34;FirstName&#34;, &#34;LastName&#34;, &#34;Age&#34;]´
-        :param table_name: The name of the table (in the database) that the data belongs to. Ex: &#34;people&#34;
-        :param id_field: The name of the column which stores the id. Ex: &#34;id&#34;. This can be set to ´None´ but needs to be provided when writing this entry back into the database.
+        Parameters
+        ----------
+        raw_entry : tuple
+            A tuple with the data for the entry. Ex: ´(2, &#34;Tom&#34;, &#34;Builder&#34;, 33)´
+        table_fields : list
+            A list of column names for the data. Ex: ´[&#34;id&#34;, &#34;FirstName&#34;, &#34;LastName&#34;, &#34;Age&#34;]´
+        table_name : str
+            The name of the table (in the database) that the data belongs to. Ex: &#34;people&#34;
+        id_field : str/None
+            The name of the column which stores the id. Ex: &#34;id&#34;. This can be set to ´None´ but needs to be provided when writing this entry back into the database.
         &#34;&#34;&#34;
 
         entry_dict = {}
@@ -2002,10 +2299,17 @@ Constructs the entry by saving the table and id_field as attributes. The ´entry
 </code></dt>
 <dd>
 <div class="desc"><p>Alternative constructor for converting a raw entry to a DatabaseEntry.</p>
-<p>:param raw_entry: A tuple with the data for the entry. Ex: ´(2, "Tom", "Builder", 33)´
-:param table_fields: A list of column names for the data. Ex: ´["id", "FirstName", "LastName", "Age"]´
-:param table_name: The name of the table (in the database) that the data belongs to. Ex: "people"
-:param id_field: The name of the column which stores the id. Ex: "id". This can be set to ´None´ but needs to be provided when writing this entry back into the database.</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>raw_entry</code></strong> :&ensp;<code>tuple</code></dt>
+<dd>A tuple with the data for the entry. Ex: ´(2, "Tom", "Builder", 33)´</dd>
+<dt><strong><code>table_fields</code></strong> :&ensp;<code>list</code></dt>
+<dd>A list of column names for the data. Ex: ´["id", "FirstName", "LastName", "Age"]´</dd>
+<dt><strong><code>table_name</code></strong> :&ensp;<code>str</code></dt>
+<dd>The name of the table (in the database) that the data belongs to. Ex: "people"</dd>
+<dt><strong><code>id_field</code></strong> :&ensp;<code>str/None</code></dt>
+<dd>The name of the column which stores the id. Ex: "id". This can be set to ´None´ but needs to be provided when writing this entry back into the database.</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -2015,10 +2319,16 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
     &#34;&#34;&#34;
     Alternative constructor for converting a raw entry to a DatabaseEntry.
     
-    :param raw_entry: A tuple with the data for the entry. Ex: ´(2, &#34;Tom&#34;, &#34;Builder&#34;, 33)´
-    :param table_fields: A list of column names for the data. Ex: ´[&#34;id&#34;, &#34;FirstName&#34;, &#34;LastName&#34;, &#34;Age&#34;]´
-    :param table_name: The name of the table (in the database) that the data belongs to. Ex: &#34;people&#34;
-    :param id_field: The name of the column which stores the id. Ex: &#34;id&#34;. This can be set to ´None´ but needs to be provided when writing this entry back into the database.
+    Parameters
+    ----------
+    raw_entry : tuple
+        A tuple with the data for the entry. Ex: ´(2, &#34;Tom&#34;, &#34;Builder&#34;, 33)´
+    table_fields : list
+        A list of column names for the data. Ex: ´[&#34;id&#34;, &#34;FirstName&#34;, &#34;LastName&#34;, &#34;Age&#34;]´
+    table_name : str
+        The name of the table (in the database) that the data belongs to. Ex: &#34;people&#34;
+    id_field : str/None
+        The name of the column which stores the id. Ex: &#34;id&#34;. This can be set to ´None´ but needs to be provided when writing this entry back into the database.
     &#34;&#34;&#34;
 
     entry_dict = {}
@@ -2064,21 +2374,26 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
 </code></dt>
 <dd>
 <div class="desc"><p>A class for writing sql queries. Queries can be run on the attached database or a seperate one with the ´run´ method</p>
-<p>Initialize query</p>
-<p>:param db: The attached Database. This is the default database to run queries on.</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>db</code></strong> :&ensp;<code><a title="sqlite_integrated.Database" href="#sqlite_integrated.Database">Database</a></code>, optional</dt>
+<dd>The attached Database. This is the default database to run queries on.</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class Query:
-    &#34;&#34;&#34;A class for writing sql queries. Queries can be run on the attached database or a seperate one with the ´run´ method&#34;&#34;&#34;
+    &#34;&#34;&#34;
+    A class for writing sql queries. Queries can be run on the attached database or a seperate one with the ´run´ method
+
+    Parameters
+    ----------
+    db : Database, optional
+        The attached Database. This is the default database to run queries on.
+    &#34;&#34;&#34;
 
     def __init__(self, db=None) -&gt; None:
-        &#34;&#34;&#34;
-        Initialize query
-
-        :param db: The attached Database. This is the default database to run queries on.
-        &#34;&#34;&#34;
         
         self._db = db
         &#34;&#34;&#34;The attached Database&#34;&#34;&#34;
@@ -2096,11 +2411,7 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
         &#34;&#34;&#34;The table the sql query is interacting with&#34;&#34;&#34;
 
     def valid_prefixes(self, prefixes: list):
-        &#34;&#34;&#34;
-        Check if a statement is valid given its prefix
-
-        :param prefixs: A list of valid prefixes.
-        &#34;&#34;&#34;
+        &#34;&#34;&#34;Check if a statement is valid given its prefix&#34;&#34;&#34;
 
         prefix = None
         if len(self.history) &gt; 0:
@@ -2113,7 +2424,10 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
         &#34;&#34;&#34;
         Sql SELECT statement.
             
-        :param selection: Either a python list or sql list of table names.
+        Parameters
+        ----------
+        selection : str/list
+            Either a python list or sql list of table names.
         &#34;&#34;&#34;
         
         self.valid_prefixes([None])
@@ -2136,7 +2450,10 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
         &#34;&#34;&#34;
         Sql FROM statement. Has to be preceded by a SELECT statement.
 
-        :param table_name: Name of the table you are selecting from.
+        Parameters
+        ----------
+        table_name :
+            Name of the table you are selecting from.
         &#34;&#34;&#34;
 
         self.valid_prefixes([&#34;SELECT&#34;])
@@ -2156,9 +2473,12 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
         &#34;&#34;&#34;
         Sql WHERE statement.
 
-        :param col_name: The name of the column. You can also just pass it a statement like: ´&#34;id&#34; = 4´ instead of providing a value.
-        :param value: The value of the column.
-
+        Parameters
+        ----------
+        col_name : str
+            The name of the column. You can also just pass it a statement like: ´&#34;id&#34; = 4´ instead of providing a value.
+        value : optional
+            The value of the column.
         &#34;&#34;&#34;
 
         self.valid_prefixes([&#34;FROM&#34;, &#34;SET&#34;])
@@ -2174,11 +2494,14 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
                 self.col = col_name.replace(&#34; &#34;, &#34;&#34;)
         return(self)
 
-    def LIKE(self, pattern):
+    def LIKE(self, pattern: str):
         &#34;&#34;&#34;
         Sql WHERE statement. Has to be preceded by a WHERE statement.
 
-        :param pattern: A typical sql LIKE pattern with % and _.
+        Parameters
+        ----------
+        pattern : str
+            A typical sql LIKE pattern with % and _.
         &#34;&#34;&#34;
 
         self.valid_prefixes([&#34;WHERE&#34;])
@@ -2190,7 +2513,10 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
         &#34;&#34;&#34;
         Sql UPDATE statement.
 
-        :param table_name: Name of the table you are updating.
+        Parameters
+        ----------
+        table_name : str
+            Name of the table you are updating.
         &#34;&#34;&#34;
 
         self.valid_prefixes([None])
@@ -2207,7 +2533,10 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
         &#34;&#34;&#34;
         Sql SET statement. Must be preceded by an UPDATE statement.
 
-        :param data: A dictionaty with key and value pairs.
+        Parameters
+        ----------
+        data : dict
+            A dictionaty with key and value pairs.
         &#34;&#34;&#34;
 
         self.valid_prefixes([&#34;UPDATE&#34;])
@@ -2220,11 +2549,14 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
 
         return(self)
 
-    def INSERT_INTO(self, table_name):
+    def INSERT_INTO(self, table_name: str):
         &#34;&#34;&#34;
         Sql INSERT INTO statement.
 
-        :param table_name: Name of the table you want to insert into.
+        Parameters
+        ----------
+        table_name : str
+            Name of the table you want to insert into.
         &#34;&#34;&#34;
 
         self.valid_prefixes([None])
@@ -2239,7 +2571,10 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
         &#34;&#34;&#34;
         Sql VALUES statement. Must be preceded by INSERT_INTO statement.
 
-        :param data: Dictionary with key value pairs.
+        Parameters
+        ----------
+        data : dict
+            Dictionary with key value pairs.
         &#34;&#34;&#34;
 
         self.valid_prefixes([&#34;INSERT_INTO&#34;])
@@ -2256,8 +2591,12 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
         &#34;&#34;&#34;
         Execute the query in the attached database or in a seperate one. Returns the results in a table (list of DatabaseEntry) or ´None´ if no results.
 
-        :param db: The database to execute to query on.
-        :param raw: If True: returns the raw table (list of tuples) instead of the normal table.
+        Parameters
+        ----------
+        db : Database, optional
+            The database to execute to query on.
+        raw : bool, optional
+            If True: returns the raw table (list of tuples) instead of the normal table.
         &#34;&#34;&#34;
 
         
@@ -2316,7 +2655,9 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
 </code></dt>
 <dd>
 <div class="desc"><p>Sql FROM statement. Has to be preceded by a SELECT statement.</p>
-<p>:param table_name: Name of the table you are selecting from.</p></div>
+<h2 id="parameters">Parameters</h2>
+<p>table_name :
+Name of the table you are selecting from.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -2325,7 +2666,10 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
     &#34;&#34;&#34;
     Sql FROM statement. Has to be preceded by a SELECT statement.
 
-    :param table_name: Name of the table you are selecting from.
+    Parameters
+    ----------
+    table_name :
+        Name of the table you are selecting from.
     &#34;&#34;&#34;
 
     self.valid_prefixes([&#34;SELECT&#34;])
@@ -2343,20 +2687,27 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
 </details>
 </dd>
 <dt id="sqlite_integrated.Query.INSERT_INTO"><code class="name flex">
-<span>def <span class="ident">INSERT_INTO</span></span>(<span>self, table_name)</span>
+<span>def <span class="ident">INSERT_INTO</span></span>(<span>self, table_name: str)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Sql INSERT INTO statement.</p>
-<p>:param table_name: Name of the table you want to insert into.</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>table_name</code></strong> :&ensp;<code>str</code></dt>
+<dd>Name of the table you want to insert into.</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def INSERT_INTO(self, table_name):
+<pre><code class="python">def INSERT_INTO(self, table_name: str):
     &#34;&#34;&#34;
     Sql INSERT INTO statement.
 
-    :param table_name: Name of the table you want to insert into.
+    Parameters
+    ----------
+    table_name : str
+        Name of the table you want to insert into.
     &#34;&#34;&#34;
 
     self.valid_prefixes([None])
@@ -2369,20 +2720,27 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
 </details>
 </dd>
 <dt id="sqlite_integrated.Query.LIKE"><code class="name flex">
-<span>def <span class="ident">LIKE</span></span>(<span>self, pattern)</span>
+<span>def <span class="ident">LIKE</span></span>(<span>self, pattern: str)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Sql WHERE statement. Has to be preceded by a WHERE statement.</p>
-<p>:param pattern: A typical sql LIKE pattern with % and _.</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>pattern</code></strong> :&ensp;<code>str</code></dt>
+<dd>A typical sql LIKE pattern with % and _.</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def LIKE(self, pattern):
+<pre><code class="python">def LIKE(self, pattern: str):
     &#34;&#34;&#34;
     Sql WHERE statement. Has to be preceded by a WHERE statement.
 
-    :param pattern: A typical sql LIKE pattern with % and _.
+    Parameters
+    ----------
+    pattern : str
+        A typical sql LIKE pattern with % and _.
     &#34;&#34;&#34;
 
     self.valid_prefixes([&#34;WHERE&#34;])
@@ -2396,7 +2754,11 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
 </code></dt>
 <dd>
 <div class="desc"><p>Sql SELECT statement.</p>
-<p>:param selection: Either a python list or sql list of table names.</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>selection</code></strong> :&ensp;<code>str/list</code></dt>
+<dd>Either a python list or sql list of table names.</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -2405,7 +2767,10 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
     &#34;&#34;&#34;
     Sql SELECT statement.
         
-    :param selection: Either a python list or sql list of table names.
+    Parameters
+    ----------
+    selection : str/list
+        Either a python list or sql list of table names.
     &#34;&#34;&#34;
     
     self.valid_prefixes([None])
@@ -2430,7 +2795,11 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
 </code></dt>
 <dd>
 <div class="desc"><p>Sql SET statement. Must be preceded by an UPDATE statement.</p>
-<p>:param data: A dictionaty with key and value pairs.</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>data</code></strong> :&ensp;<code>dict</code></dt>
+<dd>A dictionaty with key and value pairs.</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -2439,7 +2808,10 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
     &#34;&#34;&#34;
     Sql SET statement. Must be preceded by an UPDATE statement.
 
-    :param data: A dictionaty with key and value pairs.
+    Parameters
+    ----------
+    data : dict
+        A dictionaty with key and value pairs.
     &#34;&#34;&#34;
 
     self.valid_prefixes([&#34;UPDATE&#34;])
@@ -2458,7 +2830,11 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
 </code></dt>
 <dd>
 <div class="desc"><p>Sql UPDATE statement.</p>
-<p>:param table_name: Name of the table you are updating.</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>table_name</code></strong> :&ensp;<code>str</code></dt>
+<dd>Name of the table you are updating.</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -2467,7 +2843,10 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
     &#34;&#34;&#34;
     Sql UPDATE statement.
 
-    :param table_name: Name of the table you are updating.
+    Parameters
+    ----------
+    table_name : str
+        Name of the table you are updating.
     &#34;&#34;&#34;
 
     self.valid_prefixes([None])
@@ -2486,7 +2865,11 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
 </code></dt>
 <dd>
 <div class="desc"><p>Sql VALUES statement. Must be preceded by INSERT_INTO statement.</p>
-<p>:param data: Dictionary with key value pairs.</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>data</code></strong> :&ensp;<code>dict</code></dt>
+<dd>Dictionary with key value pairs.</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -2495,7 +2878,10 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
     &#34;&#34;&#34;
     Sql VALUES statement. Must be preceded by INSERT_INTO statement.
 
-    :param data: Dictionary with key value pairs.
+    Parameters
+    ----------
+    data : dict
+        Dictionary with key value pairs.
     &#34;&#34;&#34;
 
     self.valid_prefixes([&#34;INSERT_INTO&#34;])
@@ -2513,8 +2899,13 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
 </code></dt>
 <dd>
 <div class="desc"><p>Sql WHERE statement.</p>
-<p>:param col_name: The name of the column. You can also just pass it a statement like: ´"id" = 4´ instead of providing a value.
-:param value: The value of the column.</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>col_name</code></strong> :&ensp;<code>str</code></dt>
+<dd>The name of the column. You can also just pass it a statement like: ´"id" = 4´ instead of providing a value.</dd>
+<dt><strong><code>value</code></strong> :&ensp;<code>optional</code></dt>
+<dd>The value of the column.</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -2523,9 +2914,12 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
     &#34;&#34;&#34;
     Sql WHERE statement.
 
-    :param col_name: The name of the column. You can also just pass it a statement like: ´&#34;id&#34; = 4´ instead of providing a value.
-    :param value: The value of the column.
-
+    Parameters
+    ----------
+    col_name : str
+        The name of the column. You can also just pass it a statement like: ´&#34;id&#34; = 4´ instead of providing a value.
+    value : optional
+        The value of the column.
     &#34;&#34;&#34;
 
     self.valid_prefixes([&#34;FROM&#34;, &#34;SET&#34;])
@@ -2547,8 +2941,13 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
 </code></dt>
 <dd>
 <div class="desc"><p>Execute the query in the attached database or in a seperate one. Returns the results in a table (list of DatabaseEntry) or ´None´ if no results.</p>
-<p>:param db: The database to execute to query on.
-:param raw: If True: returns the raw table (list of tuples) instead of the normal table.</p></div>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>db</code></strong> :&ensp;<code><a title="sqlite_integrated.Database" href="#sqlite_integrated.Database">Database</a></code>, optional</dt>
+<dd>The database to execute to query on.</dd>
+<dt><strong><code>raw</code></strong> :&ensp;<code>bool</code>, optional</dt>
+<dd>If True: returns the raw table (list of tuples) instead of the normal table.</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -2557,8 +2956,12 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
     &#34;&#34;&#34;
     Execute the query in the attached database or in a seperate one. Returns the results in a table (list of DatabaseEntry) or ´None´ if no results.
 
-    :param db: The database to execute to query on.
-    :param raw: If True: returns the raw table (list of tuples) instead of the normal table.
+    Parameters
+    ----------
+    db : Database, optional
+        The database to execute to query on.
+    raw : bool, optional
+        If True: returns the raw table (list of tuples) instead of the normal table.
     &#34;&#34;&#34;
 
     
@@ -2593,18 +2996,13 @@ def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, i
 <span>def <span class="ident">valid_prefixes</span></span>(<span>self, prefixes: list)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Check if a statement is valid given its prefix</p>
-<p>:param prefixs: A list of valid prefixes.</p></div>
+<div class="desc"><p>Check if a statement is valid given its prefix</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def valid_prefixes(self, prefixes: list):
-    &#34;&#34;&#34;
-    Check if a statement is valid given its prefix
-
-    :param prefixs: A list of valid prefixes.
-    &#34;&#34;&#34;
+    &#34;&#34;&#34;Check if a statement is valid given its prefix&#34;&#34;&#34;
 
     prefix = None
     if len(self.history) &gt; 0:
