@@ -151,7 +151,16 @@ def test_insert_into(db):
 
     data = {"FirstName": "TestFirst", "LastName": "TestLast", "Email": "test@mail.com"}
 
-    db1.INSERT_INTO("customers").VALUES(data)
+    table_name = "customers"
+
+    db1.INSERT_INTO(table_name).VALUES(data).run()
+
+    assert len(db1.get_table(table_name)) == len(db2.get_table(table_name)) + 1
+
+    inserted_entry = db1.get_table(table_name)[-1]
+
+    assert inserted_entry['Email'] == data['Email']
+
 
     #TODO
     
