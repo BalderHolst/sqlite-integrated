@@ -1,3 +1,4 @@
+from numpy import outer
 import pytest
 import shutil
 import os
@@ -160,8 +161,35 @@ def test_insert_into(db):
     inserted_entry = db1.get_table(table_name)[-1]
 
     assert inserted_entry['Email'] == data['Email']
+    assert inserted_entry['LastName'] == data['LastName']
+    assert inserted_entry['FirstName'] == data['FirstName']
 
+def test_export_to_csv(db):
+    out_dir = "tests/test_export_to_csv"
+    os.mkdir(out_dir)
 
-    #TODO
+    db.export_to_csv(out_dir, ["customers", "artists"])
+
+    assert len(os.listdir(out_dir)) == 2
+
+    db.export_to_csv(out_dir)
+
+    assert len(os.listdir(out_dir)) == len(db.get_table_names())
     
+    db.export_to_csv(out_dir, sep = ",")
 
+    assert len(os.listdir(out_dir)) == len(db.get_table_names())
+
+    # cleanup
+    shutil.rmtree(out_dir)
+
+def test_dataframe_to_table(db):
+    df = db.table_to_dataframe("customers")
+
+    name = "test_table"
+
+    db.dataframe_to_table(name, df)
+
+    assert db.get_table_names()[-1] == name
+
+    

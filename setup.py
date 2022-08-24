@@ -14,7 +14,23 @@ setuptools.setup(
     long_description_content_type = "text/markdown",
     url = "https://github.com/BalderHolst/sqlite-integrated",
     license = "MIT",
+    classifiers=[
+        "Operating System :: OS Independent",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Topic :: Database",
+        ],
     package_dir={'': 'src'},
     python_requires = ">=3.7",
-    install_requires = []
+    install_requires = [
+        "pandas>=1.3.5",
+        "numpy>=1.21.5",
+        ],
+    extras_require={
+            'dev': [
+                'pytest',
+            ]
+        }
     )

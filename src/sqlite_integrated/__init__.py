@@ -1,3 +1,5 @@
+import pandas as pd
+import numpy
 import sqlite3
 import os
 
@@ -387,8 +389,8 @@ class DatabaseEntry(dict):
         return f"DatabaseEntry(table: {self.table}, data: {super().__repr__()})"
 
 
-# TODO implement export to csv
 # TODO implement import from csv
+# TODO rewrite sql queries with Query class
 class Database:
     """
     Main database class for manipulating sqlite3 databases
@@ -516,6 +518,16 @@ class Database:
         self.cursor.execute(f"PRAGMA table_info({name});")
         return(self.cursor.fetchall())
 
+    # TODO docs
+    # This function assumes that there is only one primary key in a table
+    def get_table_id_field(self, table):
+        cols_info = self.get_table_info(table)
+
+        for col_info in cols_info:
+            if col_info[5] == 1: # col_info[5] is 1 if field is a primary key. Otherwise it is 0.
+                return col_info[1] # col_info[1] is the name of the column
+        return(None) 
+
     def table_overview(self, name: str, max_len:int = 40, get_only = None):
         """
         Prints a pretty table (with a name).
@@ -632,7 +644,7 @@ class Database:
         return(entry)
 
 
-    def get_entry_by_id(self, table, ID, id_field=None):
+    def get_entry_by_id(self, table, ID):
         """
         Get table entry by id.
 
@@ -646,8 +658,7 @@ class Database:
             The field that holds the id value. Will use default if not set.
         """
 
-        if not id_field:
-            id_field = self.default_id_field
+        id_field = self.get_table_id_field(table)
 
         if not self.is_table(table):
             raise DatabaseException(f"Database contains no table with the name: \"{table}\". These are the available tables: {self.get_table_names()}")
@@ -670,19 +681,24 @@ class Database:
         return(DatabaseEntry.from_raw_entry(answer[0], self.get_table_columns(table), table, id_field))
 
     #TODO implement ability to use dicts as well
-    def add_table_entry(self, entry: DatabaseEntry, fill_null=False, silent=False):
+    # TODO update docs
+    def add_table_entry(self, entry, table = None, fill_null=False, silent=False, id_field=None):
         """
         Add an entry to the database. The entry must have values for all fields in the table. You can pass ´fill_null=True´ to fill remaining fields with None/null. Use ´silent=True´ to suppress warnings and messages.
 
         Parameters
         ---------------------
-        entry : DatabaseEntry
+        entry : DatabaseEntry/dict
             The entry. The entry must NOT have an id_field (it has to be ´None´: ´entry.id_field = None´).
         fill_null : bool, optional
             Fill in unpopulated fields with null values.
         silent : bool, optional
             If True: disables prints.
         """
+
+        if type(entry) == dict:
+            entry = DatabaseEntry(entry, table, None)
+            fill_null = True # TODO this is a bodge. Maybe make a Table class to hold id_fields.
 
         if entry.id_field:
             raise DatabaseException(f"Cannot add entry with a preexisting id ({entry['id']})")
@@ -795,7 +811,7 @@ class Database:
         self.conn.commit()
     
     def close(self):
-        """saves and closes the database. If you want to explicitly close without saving use: ´self.conn.close()´"""
+        """Saves and closes the database. If you want to explicitly close without saving use: ´self.conn.close()´"""
 
         self.conn.commit()
         self.conn.close()
@@ -805,6 +821,91 @@ class Database:
 
         self.conn = sqlite3.connect(self.path)
         self.cursor = self.conn.cursor()
+
+    def delete_table(self, table_name):
+        self.cursor.execute(f"DROP TABLE {table_name};")
+
+    # TODO documentation
+    def table_to_dataframe(self, table) -> pd.DataFrame:
+        cols = {}
+        fields = self.get_table_columns(table)
+
+        for f in fields:
+            cols[f] = []
+
+        for raw_entry in self.get_table_raw(table):
+            for n, field in enumerate(fields):
+                cols[field].append(raw_entry[n])
+
+        return(pd.DataFrame(cols))
+
+    # TODO add docs
+    def dataframe_to_table(self, table_name, dataframe, options=None):
+
+        # TODO
+        if options:
+            raise NotImplementedError
+        
+        fields = dataframe.keys()
+
+        col_types = []
+
+        # TODO add more types
+        for field in fields:
+            value = dataframe[field][0]
+            if isinstance(value, numpy.int64):
+                col_types.append("INTEGER")
+            elif isinstance(value, str):
+                col_types.append("TEXT")
+            else:
+                raise TypeError(f"Cannot convert value of type ´{type(value)}´ to sql. Value: {value}.")
+
+        col_pairs = []
+
+        for n, col in enumerate(fields):
+            col_type = col_types[n]
+            col_pairs.append(f"{col} {col_type}")
+
+        cols = ',\n'.join(col_pairs)
+
+        sql = f"CREATE TABLE {table_name} (\n{cols}\n)"
+
+        self.cursor.execute(sql)
+
+        for df_entry in dataframe.iloc:
+            df_entry = dict(df_entry)
+            for n, type in enumerate(col_types): 
+                if type == "INTEGER": # Convert to normal python int (from numpy.int64)
+                    df_entry[fields[n]] = int(df_entry[fields[n]])
+            entry = DatabaseEntry(df_entry, table_name, None)
+            self.add_table_entry(entry, silent=True)
+
+
+
+    def export_to_csv(self, out_dir: str, tables: list = None, sep: str = "\t"):
+        """
+        Export all or some tables in the database to csv files
+
+        Parameters
+        ----------
+        out_dir : str
+            Path to the output directory
+        tables : list[str]/None, optional
+            Can be set to only export certain tables
+        sep : str, optional
+            Seperator to use when writing csv-file
+        """
+
+        if not os.path.isdir(out_dir):
+            raise NotADirectoryError(f"{out_dir!r} is not a directory")
+
+        if not tables:
+            tables = self.get_table_names()
+
+        for table_name in tables:
+            df = self.table_to_dataframe(table_name)
+            df.to_csv(f"{out_dir}/{table_name}.csv", index=False, sep=sep)
+
 
     def SELECT(self, pattern="*"):
         """
@@ -853,3 +954,9 @@ class Database:
                 return(False)
 
         return(True)
+
+if __name__ == "__main__":
+    db = Database("tests/test.db")
+
+    print(db.get_table_id_field("customers"))
+
