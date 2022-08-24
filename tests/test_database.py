@@ -12,6 +12,9 @@ def db() -> Database:
     yield Database("tests/temp.db", silent=True)
     os.remove("tests/temp.db")
 
+
+# ================== TESTS ===================
+
 def test_creating_database():
     with pytest.raises(DatabaseException):
         Database("does_not_exist.db")
@@ -46,7 +49,7 @@ def test_get_table(db):
 
 def test_null_fill(db):
     table_name = "customers"
-    entry = DatabaseEntry({"FirstName": "TestName"}, table_name, None)
+    entry = DatabaseEntry({"FirstName": "TestName"}, table_name)
     filled_entry = db.fill_null(entry)
 
     assert len(filled_entry) == len(db.get_table(table_name)[0])
@@ -61,7 +64,7 @@ def test_get_entry_by_id(db):
 
 def test_add_table_entry(db):
     table_name = "customers"
-    entry = DatabaseEntry({"FirstName": "TestFirstName", "LastName": "TestLastName", "Email": "TestEmail"}, table_name, None)
+    entry = DatabaseEntry({"FirstName": "TestFirstName", "LastName": "TestLastName", "Email": "TestEmail"}, table_name)
 
     before_table = db.get_table(table_name)
     db.add_table_entry(entry, fill_null=True)
@@ -69,6 +72,11 @@ def test_add_table_entry(db):
 
     assert len(after_table) == len(before_table) + 1
     assert entry['FirstName'] == after_table[-1]['FirstName']
+
+    db.add_table_entry(DatabaseEntry({"FirstName": "SecondTestName", "LastName": "Laaaaaaast", "Email": "Random@email.com"}, table_name), fill_null=True)
+    after_after_table = db.get_table(table_name)
+
+    assert len(after_after_table) == len(before_table) + 2
 
 
 def test_update_entry(db):
@@ -80,6 +88,40 @@ def test_update_entry(db):
 
     assert entry_from_table['FirstName'] == "TestName"
     assert entry == entry_from_table
+
+    # Need either part=True or fill_null=True
+    with pytest.raises(DatabaseException):
+        db.update_entry({}, "customers")
+
+    with pytest.raises(DatabaseException):
+        db.update_entry(DatabaseEntry({}, "customers"))
+
+    # Part = True
+    db.update_entry(DatabaseEntry({"CustomerId": 1, "FirstName": "TestFirstName", "LastName": "TestLastName", "Email": "TestEmail"}, "customers"), part=True)
+    db.update_entry({"CustomerId": 2, "FirstName": "TestSecondFirstName", "LastName": "TestLastName", "Email": "TestEmail"}, "customers", part=True)
+
+    assert db.get_table("customers")[0]['FirstName'] == "TestFirstName"
+    assert db.get_table("customers")[1]['FirstName'] == "TestSecondFirstName"
+
+    # fill_null = True
+    db.update_entry(DatabaseEntry({"CustomerId": 3, "FirstName": "test1", "LastName": "TestLastName", "Email": "TestEmail"}, "customers"), fill_null=True)
+    db.update_entry({"CustomerId": 4, "FirstName": "test2", "LastName": "TestLastName", "Email": "TestEmail"}, "customers", fill_null=True)
+
+    assert db.get_table("customers")[2]['FirstName'] == "test1"
+    assert db.get_table("customers")[3]['FirstName'] == "test2"
+
+    # fill_null and part is NOT the same
+    db.update_entry({"CustomerId": 5, "FirstName": "firstname", "LastName": "lastname", "Email": "email"}, "customers", fill_null=True)
+    fill_null_entry = db.get_entry_by_id("customers", 5)
+
+    db.update_entry({"CustomerId": 5, "FirstName": "firstname", "LastName": "lastname", "Email": "email"}, "customers", part=True)
+    part_entry = db.get_entry_by_id("customers", 5)
+    print(f"\n\n{fill_null_entry}\n\n{part_entry}\n\n")
+
+    assert fill_null_entry != part_entry
+
+
+
 
 def test_save(db):
     path = "tests/test_save.db"

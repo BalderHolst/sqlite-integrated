@@ -41,8 +41,6 @@ def raw_table_to_table(raw_table: list, fields: list, table_name: str):
         A list of column names for the data. Ex: ´["id", "FirstName", "LastName", "Age"]´
     table_name: str
         The name of the table (in the database) that the data belongs to. Ex: "people"
-    id_field: str
-        The name of the column which stores the id. Ex: "id". This can be set to ´None´ but needs to be provided when writing entries back into the database.
     """
 
     table = []
@@ -114,7 +112,7 @@ class Query:
 
     def SELECT(self, selection="*"):
         """
-        Sql SELECT statement.
+        Sql `SELECT` statement. Must be followed by `FROM` statement.
             
         Parameters
         ----------
@@ -140,7 +138,7 @@ class Query:
 
     def FROM(self, table_name):
         """
-        Sql FROM statement. Has to be preceded by a SELECT statement.
+        Sql `FROM` statement. Has to be preceded by a SELECT statement. Can be followed by `WHERE` statement.
 
         Parameters
         ----------
@@ -163,7 +161,7 @@ class Query:
 
     def WHERE(self, col_name:str, value = ""):
         """
-        Sql WHERE statement.
+        Sql `WHERE` statement. Can be followed by `LIKE` statement.
 
         Parameters
         ----------
@@ -203,7 +201,7 @@ class Query:
 
     def UPDATE(self, table_name: str):
         """
-        Sql UPDATE statement.
+        Sql UPDATE statement. Must be followed by `SET` statement.
 
         Parameters
         ----------
@@ -223,7 +221,7 @@ class Query:
 
     def SET(self, data: dict):
         """
-        Sql SET statement. Must be preceded by an UPDATE statement.
+        Sql SET statement. Must be preceded by an UPDATE statement. Must be followed by `WHERE` statement.
 
         Parameters
         ----------
@@ -243,7 +241,7 @@ class Query:
 
     def INSERT_INTO(self, table_name: str):
         """
-        Sql INSERT INTO statement.
+        Sql `INSERT INTO` statement. Must be followed by `VALUES` statement.
 
         Parameters
         ----------
@@ -261,7 +259,7 @@ class Query:
 
     def VALUES(self, data: dict):
         """
-        Sql VALUES statement. Must be preceded by INSERT_INTO statement.
+        Sql `VALUES` statement. Must be preceded by INSERT_INTO statement.
 
         Parameters
         ----------
@@ -324,9 +322,7 @@ class Query:
 
 class DatabaseEntry(dict):
     """
-    A python dictionary that keeps track of the table where it came from, and the name and value of its id field. This class is not supposed to be created manually
-    
-    Constructs the entry by saving the table and id_field as attributes. The ´entry_dict´ is used to populate this object with data.
+    A python dictionary that keeps track of the table where it came from. This class is not supposed to be created manually.
 
     Parameters
     ----------
@@ -334,15 +330,9 @@ class DatabaseEntry(dict):
         A dictionary containing all the information. This information can be accesed just like any other python dict with ´my_entry[my_key]´.
     table : str
         The name of the table the entry is a part of
-    id_field : str/None
-        The column name for the entry's id
     """
 
-    def __init__(self, entry_dict: dict, table: str, id_field=69):
-
-        if id_field != 69:
-            print("DatabaseEntry called with id_field")
-
+    def __init__(self, entry_dict: dict, table: str):
         self.table = table
         self.update(entry_dict)
 
@@ -360,8 +350,6 @@ class DatabaseEntry(dict):
             A list of column names for the data. Ex: ´["id", "FirstName", "LastName", "Age"]´
         table_name : str
             The name of the table (in the database) that the data belongs to. Ex: "people"
-        id_field : str/None
-            The name of the column which stores the id. Ex: "id". This can be set to ´None´ but needs to be provided when writing this entry back into the database.
         """
 
         entry_dict = {}
@@ -398,8 +386,6 @@ class Database:
         Path to the database file
     new : bool, optional
         A new blank database will be created where the ´self.path´ is pointing
-    default_id_field : str, optional
-        The default name for the id field in tables
     silent : bool, optional
         Disables all feedback in the form of prints 
     """
@@ -480,9 +466,8 @@ class Database:
 
         Parameters
         ----------
+        name : str
             Name of the table.
-        id_field : str, optional
-            The id_field of the table. Will be set to the database default if not set.
         get_only : list/None, optional
             Can be set to a list of column/field names, to only retrieve those columns/fields.
         silent : bool, optional
@@ -669,7 +654,6 @@ class Database:
 
         return(DatabaseEntry.from_raw_entry(answer[0], self.get_table_columns(table), table))
 
-    #TODO implement ability to use dicts as well
     # TODO update docs
     def add_table_entry(self, entry, table = None, fill_null=False, silent=False):
         """
@@ -678,7 +662,7 @@ class Database:
         Parameters
         ---------------------
         entry : DatabaseEntry/dict
-            The entry. The entry must NOT have an id_field (it has to be ´None´: ´entry.id_field = None´).
+            The entry.
         fill_null : bool, optional
             Fill in unpopulated fields with null values.
         silent : bool, optional
@@ -687,7 +671,6 @@ class Database:
 
         if type(entry) == dict:
             entry = DatabaseEntry(entry, table)
-            fill_null = True # TODO this is a bodge. Maybe make a Table class to hold id_fields.
 
         if not self.is_table(entry.table):
             raise DatabaseException(f"Database has no table with the name \"{self.table}\". Possible tablenames are: {self.get_table_names()}")
@@ -735,8 +718,6 @@ class Database:
             DatabaseEntry or dictionary, if dictionary you also need to provide table and id_field.
         table : str, optional
             The table name.
-        id_field : str/None, optional
-            The field that holds the entry id.
         part : bool, optional
             If True: Only updates the provided fields.
         fill_null : bool, optional
@@ -857,7 +838,7 @@ class Database:
             for n, type in enumerate(col_types): 
                 if type == "INTEGER": # Convert to normal python int (from numpy.int64)
                     df_entry[fields[n]] = int(df_entry[fields[n]])
-            entry = DatabaseEntry(df_entry, table_name, None)
+            entry = DatabaseEntry(df_entry, table_name)
             self.add_table_entry(entry, silent=True)
 
 
