@@ -37,7 +37,7 @@ def test_get_table_raw_and_get_table_columns(db):
 def test_get_table(db):
     table_name = "customers"
     raw_table = db.get_table_raw(table_name)
-    table = db.get_table(table_name, id_field="CustomerId")
+    table = db.get_table(table_name)
 
     assert len(raw_table) == len(table)
     assert isinstance(table, list)
@@ -53,8 +53,8 @@ def test_null_fill(db):
 
 def test_get_entry_by_id(db):
     table_name = "customers"
-    entry_by_id = db.get_entry_by_id(table_name, 1, id_field="CustomerId")
-    entry_by_table = DatabaseEntry(db.get_table(table_name)[0], table_name, "CustomerId")
+    entry_by_id = db.get_entry_by_id(table_name, 1)
+    entry_by_table = DatabaseEntry(db.get_table(table_name)[0], table_name)
 
     assert len(entry_by_id) == len(entry_by_table)
     assert entry_by_id == entry_by_table
@@ -72,7 +72,7 @@ def test_add_table_entry(db):
 
 
 def test_update_entry(db):
-    entry = db.get_entry_by_id("customers", 1, id_field="CustomerId")
+    entry = db.get_entry_by_id("customers", 1)
     entry['FirstName'] = "TestName"
     db.update_entry(entry)
 
@@ -90,7 +90,7 @@ def test_save(db):
 
     assert db1 == db2
 
-    entry = db1.get_entry_by_id("customers", 1, id_field="CustomerId")
+    entry = db1.get_entry_by_id("customers", 1)
     entry['FirstName'] = "Different Name"
     db1.update_entry(entry)
 
@@ -138,7 +138,7 @@ def test_update(db):
 
     db1.close()
 
-    db2.update_entry(db2.get_entry_by_id("customers", 1, id_field="CustomerId"))
+    db2.update_entry(db2.get_entry_by_id("customers", 1))
 
     db1.reconnect()
 

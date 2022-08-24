@@ -1,0 +1,4 @@
+recursive-include docs *.html
+recursive-include docs *.md
+recursive-include tests *.db
+recursive-include tests *.py

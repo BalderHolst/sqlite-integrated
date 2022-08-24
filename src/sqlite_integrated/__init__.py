@@ -29,7 +29,7 @@ def value_to_sql_value(value) -> str:
     else:
         raise TypeError(f"Cannot convert value of type {type(value)} to sql")
 
-def raw_table_to_table(raw_table: list, fields: list, table_name: str, id_field):
+def raw_table_to_table(raw_table: list, fields: list, table_name: str):
     """
     Convert a raw table (list of tuples) to a table (table of dictionaries)
 
@@ -56,7 +56,7 @@ def raw_table_to_table(raw_table: list, fields: list, table_name: str, id_field)
         entry = {}
         for n, field in enumerate(fields):
             entry[field] = raw_entry[n]
-        table.append(DatabaseEntry(entry, table_name, id_field))
+        table.append(DatabaseEntry(entry, table_name))
     return(table)
 
 def dict_to_sql(data: dict) -> str:
@@ -316,7 +316,7 @@ class Query:
         if self.fields == "*":
             self.fields = db.get_table_columns(self.table)
 
-        return(raw_table_to_table(results, self.fields, self.table, None))
+        return(raw_table_to_table(results, self.fields, self.table))
     
     def __repr__(self) -> str:
         return(f"> {self.sql.strip()} <")
@@ -338,20 +338,17 @@ class DatabaseEntry(dict):
         The column name for the entry's id
     """
 
-    def __init__(self, entry_dict: dict, table: str, id_field):
+    def __init__(self, entry_dict: dict, table: str, id_field=69):
 
-        self.id_field = id_field
+        if id_field != 69:
+            print("DatabaseEntry called with id_field")
+
         self.table = table
         self.update(entry_dict)
 
-        # # check that id_field is in entry
-        # if isinstance(id_field, str):
-        #     if not id_field in self:
-        #         raise DatabaseException(f"id_field: {id_field!r} is not a field in the entry. Entry fields are: {self.keys()}")
-
 
     @classmethod
-    def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str, id_field):
+    def from_raw_entry(cls, raw_entry: tuple, table_fields: list, table_name: str):
         """
         Alternative constructor for converting a raw entry to a DatabaseEntry.
         
@@ -379,7 +376,7 @@ class DatabaseEntry(dict):
         
         for n, field in enumerate(table_fields):
             entry_dict[field] = raw_entry[n]
-        entry = DatabaseEntry(entry_dict, table_name, id_field)
+        entry = DatabaseEntry(entry_dict, table_name)
         return(entry)
         
 
@@ -480,7 +477,7 @@ class Database:
         self.cursor.execute(f"SELECT {selected} FROM {name}")
         return(self.cursor.fetchall())
 
-    def get_table(self, name: str, id_field="", get_only=None, silent=False) -> list:
+    def get_table(self, name: str, get_only=None, silent=False) -> list:
         """
         Returns all entries in a table as python dictionaries. This function loops over all entries in the table, so it is not the best in big databases.
 
@@ -495,14 +492,9 @@ class Database:
             Disables prints if True
         """
 
-        if id_field == "":
-            if not self.silent and not silent:
-                print(f"Using default id field: {self.default_id_field!r}")
-            id_field = self.default_id_field
-
         raw_table = self.get_table_raw(name, get_only)
             
-        return(raw_table_to_table(raw_table, self.get_table_columns(name), name, id_field))
+        return(raw_table_to_table(raw_table, self.get_table_columns(name), name))
 
 
     def get_table_info(self, name: str):
@@ -520,12 +512,14 @@ class Database:
 
     # TODO docs
     # This function assumes that there is only one primary key in a table
-    def get_table_id_field(self, table):
+    def get_table_id_field(self, table, do_error=False):
         cols_info = self.get_table_info(table)
 
         for col_info in cols_info:
             if col_info[5] == 1: # col_info[5] is 1 if field is a primary key. Otherwise it is 0.
                 return col_info[1] # col_info[1] is the name of the column
+        if do_error:
+            raise DatabaseException(f"The table `{table}` has no id_field (column defined as a `PRIMARY KEY`)")
         return(None) 
 
     def table_overview(self, name: str, max_len:int = 40, get_only = None):
@@ -654,11 +648,9 @@ class Database:
             Name of the table.
         ID :  
             The entry id.
-        id_field : str/None, optional
-            The field that holds the id value. Will use default if not set.
         """
 
-        id_field = self.get_table_id_field(table)
+        id_field = self.get_table_id_field(table, do_error=True)
 
         if not self.is_table(table):
             raise DatabaseException(f"Database contains no table with the name: \"{table}\". These are the available tables: {self.get_table_names()}")
@@ -674,15 +666,15 @@ class Database:
             if len(answer) > 1:
                 raise DatabaseException(f"There are more than one entry in table \"{table}\" with an id field \"{id_field}\" with the value \"{id}\": {answer}")
             elif len(answer) == 0:
-                raise DatabaseException("There is no entry in table \"{table}\" with an id_field \"{id_field}\" with a value of {ID}")
+                raise DatabaseException(f"There is no entry in table \"{table}\" with an id_field \"{id_field}\" with a value of {ID}")
             else:
                 raise DatabaseException("Something went very wrong, please contact the package author") # this will never be run... i think
 
-        return(DatabaseEntry.from_raw_entry(answer[0], self.get_table_columns(table), table, id_field))
+        return(DatabaseEntry.from_raw_entry(answer[0], self.get_table_columns(table), table))
 
     #TODO implement ability to use dicts as well
     # TODO update docs
-    def add_table_entry(self, entry, table = None, fill_null=False, silent=False, id_field=None):
+    def add_table_entry(self, entry, table = None, fill_null=False, silent=False):
         """
         Add an entry to the database. The entry must have values for all fields in the table. You can pass ´fill_null=True´ to fill remaining fields with None/null. Use ´silent=True´ to suppress warnings and messages.
 
@@ -697,11 +689,8 @@ class Database:
         """
 
         if type(entry) == dict:
-            entry = DatabaseEntry(entry, table, None)
+            entry = DatabaseEntry(entry, table)
             fill_null = True # TODO this is a bodge. Maybe make a Table class to hold id_fields.
-
-        if entry.id_field:
-            raise DatabaseException(f"Cannot add entry with a preexisting id ({entry['id']})")
 
         if not self.is_table(entry.table):
             raise DatabaseException(f"Database has no table with the name \"{self.table}\". Possible tablenames are: {self.get_table_names()}")
@@ -739,7 +728,7 @@ class Database:
             print(f"added entry to table \"{entry.table}\": {entry}")
 
 
-    def update_entry(self, entry: dict, table=None, id_field:str = None, part=False, fill_null=False, silent=False):
+    def update_entry(self, entry: dict, table=None, part=False, fill_null=False, silent=False):
         """
         Update entry in database with a DatabaseEntry, or with a dictionary + the name of the table you want to update.
 
@@ -763,15 +752,9 @@ class Database:
         if not isinstance(entry, DatabaseEntry): # the input is a dict
             if not table:
                 raise DatabaseException(f"Please provide a table when updating an entry with a python dictionary")
-            entry = DatabaseEntry(entry, table, id_field) 
-        elif id_field:
-            entry.id_field = id_field
+            entry = DatabaseEntry(entry, table) 
 
-        if not entry.id_field: # if entry has no id_field set it to the default
-            entry.id_field = self.default_id_field
-
-        if not entry.id_field in entry: # check if the id_field is a key to the entry
-            raise DatabaseException(f"Cannot update entry as entry has no id in id_field: \"{entry.id_field}\"")
+        id_field = self.get_table_id_field(entry.table)
 
         if not self.is_table(entry.table):
             raise DatabaseException(f"Database has no table with the name \"{entry.table}\". Possible tablenames are: {self.get_table_names()}")
@@ -789,7 +772,7 @@ class Database:
         data = []
 
         for field in entry: # translate python objects to sql
-            if field != entry.id_field:
+            if field != id_field:
                 value = entry[field]
                 if isinstance(value, str):
                     value = f"\"{value}\""
@@ -797,7 +780,7 @@ class Database:
                     value = "null"
                 data.append(f"{field} = {value}")
 
-        sql = f"UPDATE {entry.table} SET {', '.join(data)} WHERE {entry.id_field} = {entry[entry.id_field]}"
+        sql = f"UPDATE {entry.table} SET {', '.join(data)} WHERE {id_field} = {entry[id_field]}"
 
         self.cursor.execute(sql)
 
