@@ -404,7 +404,7 @@ class Database:
         Disables all feedback in the form of prints 
     """
 
-    def __init__(self, path: str, new = False, default_id_field="id", silent=False):
+    def __init__(self, path: str, new = False, silent=False):
 
         if not new and not os.path.isfile(path):
             raise(DatabaseException(f"no database file at \"{path}\". If you want to create one, pass \"new=True\""))
@@ -417,9 +417,6 @@ class Database:
 
         self.cursor = self.conn.cursor()
         """The sqlite3 cursor. Use ´cursor.execute(cmd)´ to execute raw sql"""
-
-        self.default_id_field = default_id_field
-        """The default name for the id_field in returned DatabaseEntry."""
 
         self.silent=silent
         """Disables all feedback in the form of prints."""
