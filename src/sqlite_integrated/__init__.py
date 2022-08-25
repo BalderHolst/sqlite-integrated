@@ -333,7 +333,7 @@ class Query:
 
 
     # TODO implement running on other databases
-    def run(self, db=None, raw = False) -> list[DatabaseEntry]:
+    def run(self, db=None, raw = False, silent=False) -> list[DatabaseEntry]:
         """
         Execute the query in the attached database or in a seperate one. Returns the results in a table (list of DatabaseEntry) or ´None´ if no results.
 
@@ -343,6 +343,8 @@ class Query:
             The database to execute to query on.
         raw : bool, optional
             If True: returns the raw table (list of tuples) instead of the normal table.
+        silent : bool, optional
+            If True: disables all prints.
         """
 
         
@@ -357,7 +359,7 @@ class Query:
         except sqlite3.OperationalError as e:
             raise QueryException(f"\n\n{e}\n\nError while running following sql: {self.sql}")
 
-        if not db.silent:
+        if not db.silent and not silent:
             print(f"Executed sql: {self.sql}")
 
         results = db.cursor.fetchall()
@@ -486,7 +488,7 @@ class Database:
         Returns sql information about a table (runs ´PRAGMA TABLE_INFO(name)´).
 
         Parameters 
-        -----------
+        ----------
         name : str
             Name of the table.
         """
@@ -664,13 +666,12 @@ class Database:
 
         return(DatabaseEntry.from_raw_entry(answer[0], self.get_table_columns(table), table))
 
-    # TODO update docs
     def add_table_entry(self, entry, table = None, fill_null=False, silent=False) -> None:
         """
         Add an entry to the database by passing a DatabaseEntry, or with a dictionary and specifying a table name. The entry must have values for all fields in the table. You can pass ´fill_null=True´ to fill remaining fields with None/null. Use ´silent=True´ to suppress warnings and messages.
 
         Parameters
-        ---------------------
+        ----------
         entry : DatabaseEntry/dict
             The entry.
         table : str
@@ -697,7 +698,7 @@ class Database:
         if set(entry) != set(table_fields):
             raise DatabaseException(f"entry fields are not the same as the table fields: {set(entry)} != {set(table_fields)}")
 
-        self.INSERT_INTO(entry.table).VALUES(entry).run()
+        self.INSERT_INTO(entry.table).VALUES(entry).run(silent=True)
 
         if not silent and not self.silent:
             print(f"added entry to table \"{entry.table}\": {entry}")
