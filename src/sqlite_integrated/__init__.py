@@ -920,10 +920,3 @@ class Database:
                 return(False)
 
         return(True)
-
-# TODO delete test code
-if __name__ == "__main__":
-    db = Database("tests/test.db")
-
-    print(db.get_table_id_field("customers"))
-
