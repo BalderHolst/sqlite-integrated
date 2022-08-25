@@ -692,6 +692,12 @@ class Database:
         
         table_fields = self.get_table_columns(entry.table)
 
+        id_field = self.get_table_id_field(entry.table)
+
+        if id_field:
+            entry[id_field] = None
+        
+
         if fill_null:
             entry = self.fill_null(entry)
 

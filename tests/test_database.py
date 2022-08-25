@@ -18,6 +18,23 @@ def test_creating_database():
     with pytest.raises(DatabaseException):
         Database("does_not_exist.db")
 
+def test_creating_database_and_table():
+    path = "tests/test_creating_database_and_table.db"
+    db = Database(path, new=True)
+
+    db.cursor.execute("""CREATE TABLE people (
+    id integer PRIMARY KEY,
+    first_name text,
+    last_name text
+    )""")
+
+    db.add_table_entry({"first_name": "John", "last_name": "Smith"}, "people")
+    db.add_table_entry({"first_name": "Tom", "last_name": "Builder"}, "people")
+    db.add_table_entry({"first_name": "Eva", "last_name": "Larson"}, "people")
+
+    os.remove(path)
+
+
 def test_get_table_names(db):
     assert len(db.get_table_names()) == 13
 

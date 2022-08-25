@@ -63,6 +63,15 @@ To view to database we can use the `table_overview` method.
 db.table_overview("people")
 ```
 
+*Output:*
+```
+id ║ first_name ║ last_name
+═══╬════════════╬═══════════
+1  ║ John       ║ Smith    
+2  ║ Tom        ║ Builder  
+3  ║ Eva        ║ Larson   
+```
+
 
 ### Opening an existing database
 
