@@ -1,4 +1,3 @@
-from numpy import outer
 import pytest
 import shutil
 import os
@@ -111,11 +110,14 @@ def test_update_entry(db):
     assert db.get_table("customers")[3]['FirstName'] == "test2"
 
     # fill_null and part is NOT the same
-    db.update_entry({"CustomerId": 5, "FirstName": "firstname", "LastName": "lastname", "Email": "email"}, "customers", fill_null=True)
+    data = {"CustomerId": 5, "FirstName": "firstname", "LastName": "lastname", "Email": "email"}
+
+    db.update_entry(data, "customers", part=True)
+    part_entry = db.get_entry_by_id("customers", 5)
+
+    db.update_entry(data, "customers", fill_null=True)
     fill_null_entry = db.get_entry_by_id("customers", 5)
 
-    db.update_entry({"CustomerId": 5, "FirstName": "firstname", "LastName": "lastname", "Email": "email"}, "customers", part=True)
-    part_entry = db.get_entry_by_id("customers", 5)
     print(f"\n\n{fill_null_entry}\n\n{part_entry}\n\n")
 
     assert fill_null_entry != part_entry
@@ -206,6 +208,13 @@ def test_insert_into(db):
     assert inserted_entry['LastName'] == data['LastName']
     assert inserted_entry['FirstName'] == data['FirstName']
 
+def test_run(db):
+    query = Query().SELECT().FROM("customers")
+
+    assert query.run(db) == db.SELECT().FROM("customers").run()
+
+    assert len(Query().SELECT(["FirstName", "LastName"]).FROM("customers").run(db)[0]) == 2
+
 def test_export_to_csv(db):
     out_dir = "tests/test_export_to_csv"
     os.mkdir(out_dir)
@@ -234,4 +243,3 @@ def test_dataframe_to_table(db):
 
     assert db.get_table_names()[-1] == name
 
-    
