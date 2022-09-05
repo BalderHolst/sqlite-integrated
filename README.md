@@ -1,6 +1,6 @@
 # What is this?
 
-This package provides classes to make handling of sqlite3 databases easier. I have strived to make it as simple as possible, and the error messages as helpful as possible. The main Database class handles reading from and writing to the database. The DatabaseEntry class represents a single database entry. It can be used like a dictionary to assign new values to the entry. Ex: `entry['name'] = "New Name"`. The `Query` class can be used to create sql-queries with or without an attached Database to run it on.
+This package provides classes to make handling of sqlite3 databases easier. I have strived to make it as simple as possible, and the error messages as helpful as possible. The main `Database` class handles reading from and writing to the database. The `DatabaseEntry` class represents a single database entry. It can be used like a dictionary to assign new values to the entry. Ex: `entry['name'] = "New Name"`. The `Query` class can be used to create sql-queries with or without an attached Database to run it on.
 
 # Installation
 Install with pip
@@ -10,6 +10,9 @@ pip install sqlite-integrated
 
 # Read the documentation
 The documentation can be found [here](https://htmlpreview.github.io/?https://github.com/BalderHolst/sqlite-integrated/blob/main/docs/sqlite_integrated/index.html).
+
+# Github Repo
+If you are interested in the open source code, click [here](https://github.com/BalderHolst/sqlite-integrated).
 
 # How to use it!
 
@@ -176,7 +179,7 @@ Executed sql: SELECT FirstName FROM customers WHERE FirstName LIKE 'T%'
 Results: [DatabaseEntry(table: customers, data: {'FirstName': 'Tim'}), DatabaseEntry(table: customers, data: {'FirstName': 'Terhi'})]
 ```
 
-We can se that there are only two customers with a first name that startes with 't'.
+We can see that there are only two customers with a first name that starts with 't'.
 
 By default the database prints the sql that is executed in the database, to the terminal. This can be disabled by passing `silent=True` to the `run` method.
 
@@ -293,7 +296,7 @@ from sqlite_integrated import Query
 # Loading an existing database
 db1 = Database("path/to/database.db")
 
-# Loading the same database to a different vaiable
+# Loading the same database to a different variable
 db2 = Database("path/to/database.db")
 
 # Updating the first entry in the first database only
@@ -321,3 +324,6 @@ db1 output: [DatabaseEntry(table: customers, data: {'CustomerId': 1, 'FirstName'
 
 db2 output: [DatabaseEntry(table: customers, data: {'CustomerId': 1, 'FirstName': 'Luís', 'LastName': 'Gonçalves', 'Company': 'Embraer - Empresa Brasileira de Aeronáutica S.A.', 'Address': 'Av. Brigadeiro Faria Lima, 2170', 'City': 'São José dos Campos', 'State': 'SP', 'Country': 'Brazil', 'PostalCode': '12227-000', 'Phone': '+55 (12) 3923-5555', 'Fax': '+55 (12) 3923-5566', 'Email': 'luisg@embraer.com.br', 'SupportRepId': 3})]
 ```
+
+# Contributing
+I would be more than happy if anyone finds this useful enough to add to, or modify this code.
