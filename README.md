@@ -8,12 +8,13 @@ Install with pip
 pip install sqlite-integrated
 ```
 
-
+# Read the documentation
+The documentation can be found [here](https://htmlpreview.github.io/?https://github.com/BalderHolst/sqlite-integrated/blob/main/docs/sqlite_integrated/index.html).
 
 # How to use it!
 
 ### Creating a new database
-Start by importing the class and creating our NEW database (remember to put in a valid path to the database file)
+Start by importing the class and creating our NEW database (remember to put in a valid path to the database file).
 ```python
 from sqlite_integrated import Database
 db = Database("path/to/database.db", new=True)
@@ -21,7 +22,7 @@ db = Database("path/to/database.db", new=True)
 
 We pass `new=True` to create a new database file.
 
-We can now create a table with sql
+We can now create a table with sql. Note that we create a column assigned as "PRIMARY KEY". Every table should have one of these columns. It makes sure that every entry has a unique id, so that we can keep track of it.
 
 ```python
 db.cursor.execute("""CREATE TABLE people (
@@ -31,7 +32,7 @@ last_name text
 )""")
 ```
 
-We can see an overview of the tables in the database and their table fields with the method `overview`.
+We can see an overview of the tables in the database and their table fields with the method `overview`. 
 
 ```python
 db.overview()
@@ -46,16 +47,16 @@ Tables
 		last_name
 ```
 
-To add an entry use the `add_table_entry` method
+To add an entry use the `add_entry` method.
 ```python
-db.add_table_entry({"first_name": "John", "last_name": "Smith"}, "people")
+db.add_entry({"first_name": "John", "last_name": "Smith"}, "people")
 ```
 
-Let's add a few more
+Let's add a few more!
 
 ```python
-db.add_table_entry({"first_name": "Tom", "last_name": "Builder"}, "people")
-db.add_table_entry({"first_name": "Eva", "last_name": "Larson"}, "people")
+db.add_entry({"first_name": "Tom", "last_name": "Builder"}, "people")
+db.add_entry({"first_name": "Eva", "last_name": "Larson"}, "people")
 ```
 
 To view to database we can use the `table_overview` method.
@@ -75,20 +76,41 @@ id ║ first_name ║ last_name
 
 ### Opening an existing database
 
-Start by importing the class and opening our database
+Start by importing the class and opening our database.
 ```python
 from sqlite_integrated import Database
 db = Database("path/to/database.db")
 ```
 
-Just to check you can now run
+Just to check you can now run.
 ```python
 print(db.overview())
 ```
 This will print list of all tables in the database.
 
 
-###
+### Editing an entry
+
+We start by getting the entry. In this case the 3rd entry in the table "customers".
+```python
+entry = db.get_entry_by_id("customers", 3)
+```
+
+Now edit as much as you desire!
+```python
+entry["FirstName"] = "John"
+entry["LastName"] = "Newname"
+entry["City"] = "Atlantis"
+```
+
+To update our table we can simply use the `update_entry` method.
+
+```python
+db.update_entry(entry)
+```
+
+To save these changes to the database file, use the `save` method.
+
 
 
 ## More examples
@@ -130,7 +152,7 @@ Puja      ║ Srivastava   ║ 3,Raj Bhavan Road                        ║ Bang
 
 ### Using queries
 
-##### Select Statement
+#### Select Statement
 ```python
 from sqlite_integrated import Database
 
@@ -158,7 +180,7 @@ We can se that there are only two customers with a first name that startes with 
 
 By default the database prints the sql that is executed in the database, to the terminal. This can be disabled by passing `silent=True` to the `run` method.
 
-##### Insert Statement
+#### Insert Statement
 ```python
 from sqlite_integrated import Database
 
@@ -201,7 +223,7 @@ CustomerId ║ FirstName ║ LastName     ║ Email                         ║ 
 
 ```
 
-##### Update Statement
+#### Update Statement
 ```python
 from sqlite_integrated import Database
 
@@ -263,7 +285,7 @@ CustomerId ║ FirstName ║ LastName     ║ Email                         ║ 
 
 ```
 
-##### Unattached queries
+#### Unattached queries
 ```python
 from sqlite_integrated import Database
 from sqlite_integrated import Query

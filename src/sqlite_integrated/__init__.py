@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy
 import sqlite3
 import os
 
@@ -59,16 +58,16 @@ class DatabaseEntry(dict):
 
 def raw_table_to_table(raw_table: list, fields: list, table_name: str) -> list[DatabaseEntry]:
     """
-    Convert a raw table (list of tuples) to a table (table of dictionaries)
+    Convert a raw table (list of tuples) to a table (list of dictionaries)
 
     Parameters
     ----------
     raw_table : list
-        A tuple with the data for the entry. Ex: ´(2, "Tom", "Builder", 33)´
+        A list of tuples with the data for the entries.
     fields : list
         A list of column names for the data. Ex: ´["id", "FirstName", "LastName", "Age"]´
     table_name: str
-        The name of the table (in the database) that the data belongs to. Ex: "people"
+        The name of the table (in the database) that the data belongs to. Ex: "people".
     """
 
     table = []
@@ -134,9 +133,11 @@ class Query:
     ----------
     db : Database, optional
         The attached Database. This is the default database to run queries on.
+    silent : bool, optional
+        If true: disables prints.
     """
 
-    def __init__(self, db=None) -> None:
+    def __init__(self, db=None, silent=False) -> None:
         
         self._db = db
         """The attached Database"""
@@ -152,6 +153,9 @@ class Query:
 
         self.table = None
         """The table the sql query is interacting with"""
+
+        self.silent = silent
+        """If true: disables prints"""
 
     def valid_prefixes(self, prefixes: list) -> None:
         """Check if a statement is valid given its prefix"""
@@ -170,7 +174,7 @@ class Query:
         Parameters
         ----------
         selection : str/list
-            Either a python list or sql list of table names.
+            Either a python list or sql list of table names. Selects all columns if not set.
         """
         
         self.valid_prefixes([None])
@@ -195,7 +199,7 @@ class Query:
 
         Parameters
         ----------
-        table_name :
+        table_name : str
             Name of the table you are selecting from.
         """
 
@@ -239,7 +243,7 @@ class Query:
 
     def LIKE(self, pattern: str):
         """
-        Sql WHERE statement. Has to be preceded by a WHERE statement.
+        Sql LIKE statement. Has to be preceded by a WHERE statement.
 
         Parameters
         ----------
@@ -358,7 +362,7 @@ class Query:
         except sqlite3.OperationalError as e:
             raise QueryException(f"\n\n{e}\n\nError while running following sql: {self.sql}")
 
-        if not db.silent and not silent:
+        if not db.silent and not self.silent and not silent:
             print(f"Executed sql: {self.sql}")
 
         results = db.cursor.fetchall()
@@ -398,7 +402,7 @@ class Database:
     def __init__(self, path: str, new = False, silent=False):
 
         if not new and not os.path.isfile(path):
-            raise(DatabaseException(f"no database file at \"{path}\". If you want to create one, pass \"new=True\""))
+            raise(DatabaseException(f"No database file at \"{path}\". If you want to create one, pass \"new=True\""))
 
         self.path = path
         """Path to the database file."""
@@ -440,13 +444,13 @@ class Database:
 
     def get_table_raw(self, name: str, get_only = None) -> list:
         """
-        Returns all entries in a table as a list of tuples
+        Returns all entries in a table as a list of tuples.
         
         Parameters
         ----------
         name : str
             Name of the table.
-        get_only : list/None
+        get_only : list, optional
             Can be set to a list of column/field names, to only retrieve those columns/fields.
         """
 
@@ -467,7 +471,7 @@ class Database:
 
     def get_table(self, name: str, get_only=None) -> list:
         """
-        Returns all entries in a table as python dictionaries. This function loops over all entries in the table, so it is not the best in big databases.
+        Returns all entries in a table as a table (list of DatabaseEntry). This function loops over all entries in the table, so it is not the best in very big databases.
 
         Parameters
         ----------
@@ -526,7 +530,7 @@ class Database:
             Name of the table.
         max_len : int, optional
             The max number of rows shown.
-        get_only : list/None, optional
+        get_only : list, optional
             If given a list of column/field names: only shows those
                 
         """
@@ -588,8 +592,15 @@ class Database:
     def overview(self) -> None:
         """Prints an overview of all the tables in the database with their fields."""
 
+        table_names = self.get_table_names()
+
+        # if there are no tables in database
+        if len(table_names) == 0:
+            print(f"There are no tables in sqlite database at \"{self.path}\".")
+            return(None)
+
         text = "Tables\n"
-        for table_name in self.get_table_names():
+        for table_name in table_names:
             text += "\t" + table_name + "\n"
             for col_name in self.get_table_columns(table_name):
                 text += "\t\t" + col_name + "\n"
@@ -614,7 +625,7 @@ class Database:
 
     def fill_null(self, entry: DatabaseEntry) -> DatabaseEntry:
         """
-        Fills out any unpopulated fields in a DatabaseEntry (fields that exist in the database but not in the entry).
+        Fills out any unpopulated fields in a DatabaseEntry (fields that exist in the database table but not in the entry).
 
         Parameters
         ----------
@@ -665,7 +676,7 @@ class Database:
 
         return(DatabaseEntry.from_raw_entry(answer[0], self.get_table_columns(table), table))
 
-    def add_table_entry(self, entry, table = None, fill_null=False, silent=False) -> None:
+    def add_entry(self, entry, table = None, fill_null=False, silent=False) -> None:
         """
         Add an entry to the database by passing a DatabaseEntry, or with a dictionary and specifying a table name. The entry must have values for all fields in the table. You can pass ´fill_null=True´ to fill remaining fields with None/null. Use ´silent=True´ to suppress warnings and messages.
 
@@ -673,8 +684,8 @@ class Database:
         ----------
         entry : DatabaseEntry/dict
             The entry.
-        table : str
-            Name of the table the entry belongs to. Only needed if adding an entry with a dictionary.
+        table : str, optional
+            Name of the table the entry belongs to. **Needed if adding an entry with a dictionary**.
         fill_null : bool, optional
             Fill in unpopulated fields with null values.
         silent : bool, optional
@@ -718,7 +729,7 @@ class Database:
         entry : DatabaseEntry/dict
             DatabaseEntry or dictionary, if dictionary you also need to provide table and id_field.
         table : str, optional
-            The table name.
+            The table name. **Needed if updating an entry with a dictionary**.
         part : bool, optional
             If True: Only updates the provided fields.
         fill_null : bool, optional
@@ -803,49 +814,6 @@ class Database:
 
         return(pd.DataFrame(cols))
 
-    # TODO
-    def dataframe_to_table(self, table_name, dataframe, options=None) -> None:
-        """**NOT IMPLEMENTED**"""
-
-        # TODO
-        if options:
-            raise NotImplementedError
-        
-        fields = dataframe.keys()
-
-        col_types = []
-
-        # TODO add more types
-        for field in fields:
-            value = dataframe[field][0]
-            if isinstance(value, numpy.int64):
-                col_types.append("INTEGER")
-            elif isinstance(value, str):
-                col_types.append("TEXT")
-            else:
-                raise TypeError(f"Cannot convert value of type ´{type(value)}´ to sql. Value: {value}.")
-
-        col_pairs = []
-
-        for n, col in enumerate(fields):
-            col_type = col_types[n]
-            col_pairs.append(f"{col} {col_type}")
-
-        cols = ',\n'.join(col_pairs)
-
-        sql = f"CREATE TABLE {table_name} (\n{cols}\n)"
-
-        self.cursor.execute(sql)
-
-        for df_entry in dataframe.iloc:
-            df_entry = dict(df_entry)
-            for n, type in enumerate(col_types): 
-                if type == "INTEGER": # Convert to normal python int (from numpy.int64)
-                    df_entry[fields[n]] = int(df_entry[fields[n]])
-            entry = DatabaseEntry(df_entry, table_name)
-            self.add_table_entry(entry, silent=True)
-
-
 
     def export_to_csv(self, out_dir: str, tables: list = None, sep: str = "\t") -> None:
         """
@@ -882,7 +850,7 @@ class Database:
             Either a python list or sql list of table names.
         """
 
-        return(Query(db=self).SELECT(pattern))
+        return(Query(db=self, silent=True).SELECT(pattern))
 
     def UPDATE(self, table_name) -> Query:
         """
@@ -893,7 +861,7 @@ class Database:
         table_name : str
             Name of the table.
         """
-        return(Query(db=self).UPDATE(table_name))
+        return(Query(db=self, silent=True).UPDATE(table_name))
 
     def INSERT_INTO(self, table_name) -> Query:
         """
@@ -905,7 +873,7 @@ class Database:
             Name of the table.
         """
 
-        return(Query(db=self).INSERT_INTO(table_name))
+        return(Query(db=self, silent=True).INSERT_INTO(table_name))
         
     def __eq__(self, other: object) -> bool:
         tables = self.get_table_names()
@@ -917,5 +885,4 @@ class Database:
                 return(False)
             elif self.get_table_info(table) != other.get_table_info(table):
                 return(False)
-
         return(True)

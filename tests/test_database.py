@@ -28,9 +28,9 @@ def test_creating_database_and_table():
     last_name text
     )""")
 
-    db.add_table_entry({"first_name": "John", "last_name": "Smith"}, "people")
-    db.add_table_entry({"first_name": "Tom", "last_name": "Builder"}, "people")
-    db.add_table_entry({"first_name": "Eva", "last_name": "Larson"}, "people")
+    db.add_entry({"first_name": "John", "last_name": "Smith"}, "people")
+    db.add_entry({"first_name": "Tom", "last_name": "Builder"}, "people")
+    db.add_entry({"first_name": "Eva", "last_name": "Larson"}, "people")
 
     os.remove(path)
 
@@ -78,18 +78,18 @@ def test_get_entry_by_id(db):
     assert len(entry_by_id) == len(entry_by_table)
     assert entry_by_id == entry_by_table
 
-def test_add_table_entry(db):
+def test_add_entry(db):
     table_name = "customers"
     entry = DatabaseEntry({"FirstName": "TestFirstName", "LastName": "TestLastName", "Email": "TestEmail"}, table_name)
 
     before_table = db.get_table(table_name)
-    db.add_table_entry(entry, fill_null=True)
+    db.add_entry(entry, fill_null=True)
     after_table = db.get_table(table_name)
 
     assert len(after_table) == len(before_table) + 1
     assert entry['FirstName'] == after_table[-1]['FirstName']
 
-    db.add_table_entry(DatabaseEntry({"FirstName": "SecondTestName", "LastName": "Laaaaaaast", "Email": "Random@email.com"}, table_name), fill_null=True)
+    db.add_entry(DatabaseEntry({"FirstName": "SecondTestName", "LastName": "Laaaaaaast", "Email": "Random@email.com"}, table_name), fill_null=True)
     after_after_table = db.get_table(table_name)
 
     assert len(after_after_table) == len(before_table) + 2
@@ -251,13 +251,4 @@ def test_export_to_csv(db):
 
     # cleanup
     shutil.rmtree(out_dir)
-
-def test_dataframe_to_table(db):
-    df = db.table_to_dataframe("customers")
-
-    name = "test_table"
-
-    db.dataframe_to_table(name, df)
-
-    assert db.get_table_names()[-1] == name
 

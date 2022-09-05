@@ -5,11 +5,11 @@ with open("README.md", "r") as f:
 
 setuptools.setup(
     name = "sqlite-integrated",
-    version = "0.0.1",
+    version = "0.0.3",
     author = "Balder Holst",
     author_email = "balderwh@gmail.com",
     packages = ["sqlite_integrated"],
-    description = "Easily manipulate sqlite databases with python dictionaries",
+    description = "Easily manipulate sqlite databases with simple syntax",
     long_description = description,
     long_description_content_type = "text/markdown",
     url = "https://github.com/BalderHolst/sqlite-integrated",
