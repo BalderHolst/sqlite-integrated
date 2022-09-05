@@ -87,7 +87,7 @@ db = Database("path/to/database.db")
 
 Just to check you can now run.
 ```python
-print(db.overview())
+db.overview()
 ```
 This will print list of all tables in the database.
 
