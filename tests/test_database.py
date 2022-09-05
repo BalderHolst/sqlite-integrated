@@ -231,6 +231,7 @@ def test_run(db):
     assert query.run(db) == db.SELECT().FROM("customers").run()
 
     assert len(Query().SELECT(["FirstName", "LastName"]).FROM("customers").run(db)[0]) == 2
+    assert Query().SELECT(["FirstName", "LastName"]).FROM("customers").run(db)[0] == db.SELECT(["FirstName", "LastName"]).FROM("customers").run()[0]
 
 def test_export_to_csv(db):
     out_dir = "tests/test_export_to_csv"

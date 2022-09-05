@@ -332,7 +332,6 @@ class Query:
         return(self)
 
 
-    # TODO implement running on other databases
     def run(self, db=None, raw = False, silent=False) -> list[DatabaseEntry]:
         """
         Execute the query in the attached database or in a seperate one. Returns the results in a table (list of DatabaseEntry) or ´None´ if no results.
