@@ -3,18 +3,38 @@ import sqlite3
 import os
 from dataclasses import dataclass
 
-# TODO doc
 
 @dataclass
-class Column:
-    title: str
-    type: str
-    not_null: bool = None
-    default_value: any = None
-    primary_key: bool = False
-    col_id: int = None
+class ForeignKey:
+    table: str
+    to_col: str
+    from_col: str = None
+    id: int = None
+    seq: int = None
+    on_update: str = None
+    on_delete: str = None
+    match: str = None
 
-    forign_key: dict = None
+
+# TODO doc
+# TODO add type checkting to type parameter
+@dataclass
+class Column:
+
+    def __init__(self, title: str, type: str, not_null: bool = None, default_value: any = None, primary_key: bool = False, col_id: int = None, foreign_key: ForeignKey = None) -> None:
+        self.title = title
+        self.type = type
+        self.not_null = not_null
+        self.default_value = default_value
+        self.primary_key = primary_key
+        self.col_id = col_id
+        
+        if foreign_key:
+            foreign_key.from_col = title
+        self.foreign_key = foreign_key
+
+
+    
 
     def __repr__(self) -> str:
         attrs = []
@@ -28,8 +48,8 @@ class Column:
             attrs.append(f"DEFAULT: {self.default_value}")
         if self.primary_key:
             attrs.append("PRIMARY KEY")
-        if self.forign_key:
-            attrs.append(f"FORIGN KEY ({self.forign_key['from']}) REFERENCES {self.forign_key['table']} ({self.forign_key['to']})")
+        if self.foreign_key:
+            attrs.append(f"FOREIGN KEY ({self.foreign_key.from_col}) REFERENCES {self.foreign_key.table} ({self.foreign_key.to_col})")
         return(f"Column({', '.join(attrs)})")
 
 
@@ -447,7 +467,30 @@ class Database:
         self.silent=silent
         """Disables all feedback in the form of prints."""
 
-        self.conn.execute("PRAGMA foregin_keys = ON")
+        self.conn.execute("PRAGMA foreign_keys = ON")
+
+    def create_table(self, name: str, cols: list[Column]):
+        sql = f"CREATE TABLE {name} (\n"
+
+        foreign_keys = []
+
+        for col in cols:
+            sql += f"{col.title} {col.type}"
+
+            if col.primary_key:
+                sql += " PRIMARY KEY"
+            if col.foreign_key:
+                foreign_keys.append(col.foreign_key)
+            sql += ",\n"
+
+        for key in foreign_keys:
+            sql += f"FOREIGN KEY({key.from_col}) REFERENCES {key.table}({key.to_col}),\n"
+
+
+        sql = sql[:-2] + "\n)" # remove last ",\n"
+
+        self.cursor.execute(sql)
+
 
     def get_table_names(self) -> list:
         """Returns the names of all tables in the database."""
@@ -541,25 +584,26 @@ class Database:
             cols.append(Column(col_raw_info[1], col_raw_info[2], not_null, col_raw_info[4], is_primary, col_id=col_raw_info[0]))
 
         
-        # Add forign keys to cols
+        # Add foreign keys to cols
         self.cursor.execute(f"PRAGMA foreign_key_list({name});")
-        forign_key_list = self.cursor.fetchall()
+        foreign_key_list = self.cursor.fetchall()
 
-        if len(forign_key_list) > 0:
-            for raw_forign_key in forign_key_list:
-                forign_key = {
-                        "id": raw_forign_key[0],
-                        "seq": raw_forign_key[1],
-                        "table": raw_forign_key[2],
-                        "from": raw_forign_key[3],
-                        "to": raw_forign_key[4],
-                        "on_update": raw_forign_key[5],
-                        "on_delete": raw_forign_key[6],
-                        "match": raw_forign_key[7]
-                        }
+        if len(foreign_key_list) > 0:
+            for raw_foreign_key in foreign_key_list:
+                foreign_key = ForeignKey(
+                        raw_foreign_key[2],
+                        raw_foreign_key[4],
+                        id=raw_foreign_key[0],
+                        seq=raw_foreign_key[1],
+                        from_col=raw_foreign_key[3],
+                        on_update=raw_foreign_key[5],
+                        on_delete=raw_foreign_key[6],
+                        match=raw_foreign_key[7]
+                        )
+
                 for n, col in enumerate(cols):
-                    if col.title == forign_key['from']:
-                        cols[n].forign_key = forign_key
+                    if col.title == foreign_key.from_col:
+                        cols[n].foreign_key = foreign_key
                         break
                         
 
@@ -956,7 +1000,24 @@ class Database:
 
 
 if __name__ == "__main__":
-    db = Database("/home/Balder/Projects/slægtsregister/database/slægt.db")
+    # db = Database("/home/Balder/Projects/slægtsregister/database/slægt.db")
 
-    for l in db.get_table_cols("person_marriage"):
+    path = "tests/tmp.db"
+
+    os.remove(path)
+
+    db = Database(path, new=True)
+
+    db.create_table("table1", [
+        Column("id", "integer", primary_key=True), 
+        Column("col1", "text")
+        ])
+
+    db.create_table("table2", [
+        Column("id", "integer", primary_key=True), 
+        Column("table2_id", "integer", foreign_key=ForeignKey("table1", "id"))
+        ])
+
+    for l in db.get_table_cols("table2"):
         print(l)
+
