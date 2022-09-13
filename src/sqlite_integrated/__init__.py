@@ -2,6 +2,37 @@ import pandas as pd
 import sqlite3
 import os
 
+from tables.idxutils import col_medium
+
+# TODO doc
+class Column:
+    def __init__(self, title: str, type: str, not_null = False, default_value = None, primary_key = False, col_id = None, forign_key = None) -> None:
+        self.title = title
+        self.type = type
+        self.not_null = not_null
+        self.default_value = default_value
+        self.primary_key = primary_key
+        self.col_id = col_id
+
+        self.forign_key = forign_key
+
+    def __repr__(self) -> str:
+        attrs = []
+        if self.col_id:
+            attrs.append(str(self.col_id))
+        attrs.append(self.title)
+        attrs.append(self.type)
+        if self.not_null:
+            attrs.append("NOT NULL")
+        if self.default_value:
+            attrs.append(f"DEFAULT: {self.default_value}")
+        if self.primary_key:
+            attrs.append("PRIMARY KEY")
+        if self.forign_key:
+            attrs.append(f"FORIGN KEY ({self.forign_key['from']}) REFERENCES {self.forign_key['table']} ({self.forign_key['to']})")
+        return(f"Column({', '.join(attrs)})")
+
+
 class DatabaseEntry(dict):
     """
     A python dictionary that keeps track of the table where it came from. This class is not supposed to be created manually.
@@ -497,7 +528,43 @@ class Database:
         """
 
         self.cursor.execute(f"PRAGMA table_info({name});")
-        return(self.cursor.fetchall())
+        cols_raw_info = self.cursor.fetchall()
+
+        cols = []
+        for col_raw_info in cols_raw_info:
+            is_primary = False
+            if col_raw_info[5] == 1:
+                is_primary = True
+            not_null = False
+            if col_raw_info[3] == 1:
+                not_null = True
+            cols.append(Column(col_raw_info[1], col_raw_info[2], not_null, col_raw_info[4], is_primary, col_id=col_raw_info[0]))
+
+        
+        # Add forign keys to cols
+        self.cursor.execute(f"PRAGMA foreign_key_list({name});")
+        forign_key_list = self.cursor.fetchall()
+
+        if len(forign_key_list) > 0:
+            for raw_forign_key in forign_key_list:
+                forign_key = {
+                        "id": raw_forign_key[0],
+                        "seq": raw_forign_key[1],
+                        "table": raw_forign_key[2],
+                        "from": raw_forign_key[3],
+                        "to": raw_forign_key[4],
+                        "on_update": raw_forign_key[5],
+                        "on_delete": raw_forign_key[6],
+                        "match": raw_forign_key[7]
+                        }
+                for n, col in enumerate(cols):
+                    if col.title == forign_key['from']:
+                        cols[n].forign_key = forign_key
+                        break
+                        
+
+
+        return(cols)
 
     def get_table_id_field(self, table, do_error=False) -> str:
         """
@@ -886,3 +953,10 @@ class Database:
             elif self.get_table_info(table) != other.get_table_info(table):
                 return(False)
         return(True)
+
+
+if __name__ == "__main__":
+    db = Database("/home/Balder/Projects/slægtsregister/database/slægt.db")
+
+    for l in db.get_table_info("person_marriage"):
+        print(l)
