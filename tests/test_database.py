@@ -51,7 +51,7 @@ def test_get_table_raw(db):
 def test_get_table_raw_and_get_table_columns(db):
     for table_name in db.get_table_names():
         table = db.get_table_raw(table_name)
-        assert len(table[0]) == len(db.get_table_columns(table_name))
+        assert len(table[0]) == len(db.get_table_cols(table_name))
 
 def test_get_table(db):
     table_name = "customers"

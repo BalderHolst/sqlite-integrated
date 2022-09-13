@@ -1,20 +1,20 @@
 import pandas as pd
 import sqlite3
 import os
-
-from tables.idxutils import col_medium
+from dataclasses import dataclass
 
 # TODO doc
-class Column:
-    def __init__(self, title: str, type: str, not_null = False, default_value = None, primary_key = False, col_id = None, forign_key = None) -> None:
-        self.title = title
-        self.type = type
-        self.not_null = not_null
-        self.default_value = default_value
-        self.primary_key = primary_key
-        self.col_id = col_id
 
-        self.forign_key = forign_key
+@dataclass
+class Column:
+    title: str
+    type: str
+    not_null: bool = None
+    default_value: any = None
+    primary_key: bool = False
+    col_id: int = None
+
+    forign_key: dict = None
 
     def __repr__(self) -> str:
         attrs = []
@@ -238,7 +238,7 @@ class Query:
         self.table = table_name
 
         if self._db:
-            table_fields = set(self._db.get_table_columns(table_name)) # check if selected fields are in table
+            table_fields = set(self._db.get_column_names(table_name)) # check if selected fields are in table
 
         if self.fields != "*" and self._db and not set(self.fields).issubset(table_fields):
             raise QueryException(f"Some selected field(s): {set(self.fields) - table_fields} are not fields/columns in the table: {table_name!r}. The table has the following fields: {table_fields}")
@@ -302,7 +302,7 @@ class Query:
         if self._db:
             if not self._db.is_table(table_name):
                 raise QueryException(f"Database has no table called {table_name!r}")
-            self.fields = self._db.get_table_columns(table_name)
+            self.fields = self._db.get_column_names(table_name)
         self.table = table_name
         self.sql += f"UPDATE {table_name} "
         return(self)
@@ -343,7 +343,7 @@ class Query:
         self.history.append("INSERT_INTO")
         self.table = table_name
         if self._db:
-            self.fields = self._db.get_table_columns(table_name)
+            self.fields = self._db.get_column_names(table_name)
         self.sql += f"INSERT INTO {table_name} "
         return(self)
 
@@ -404,7 +404,7 @@ class Query:
             return(results)
 
         if self.fields == "*":
-            self.fields = db.get_table_columns(self.table)
+            self.fields = db.get_column_names(self.table)
 
         return(raw_table_to_table(results, self.fields, self.table))
     
@@ -489,7 +489,7 @@ class Database:
         
         if get_only:
             if isinstance(get_only, list):
-                fields = self.get_table_columns(name)
+                fields = self.get_column_names(name)
                 for field in get_only:
                     if not field in fields:
                         raise DatabaseException(f"Table \"{name}\" contains no field/column with the name: \"{field}\". Available fields are: {fields}")
@@ -514,10 +514,10 @@ class Database:
 
         raw_table = self.get_table_raw(name, get_only)
             
-        return(raw_table_to_table(raw_table, self.get_table_columns(name), name))
+        return(raw_table_to_table(raw_table, self.get_column_names(name), name))
 
 
-    def get_table_info(self, name: str) -> list[tuple]:
+    def get_table_cols(self, name: str) -> list[tuple]:
         """
         Returns sql information about a table (runs ´PRAGMA TABLE_INFO(name)´).
 
@@ -578,11 +578,11 @@ class Database:
             If True: Raises error if the table does not contain a field marked as `PRIMARY KEY`
         """
 
-        cols_info = self.get_table_info(table)
+        cols = self.get_table_cols(table)
 
-        for col_info in cols_info:
-            if col_info[5] == 1: # col_info[5] is 1 if field is a primary key. Otherwise it is 0.
-                return col_info[1] # col_info[1] is the name of the column
+        for col in cols:
+            if col.primary_key == True: # col_info[5] is 1 if field is a primary key. Otherwise it is 0.
+                return col.title # col_info[1] is the name of the column
         if do_error:
             raise DatabaseException(f"The table `{table}` has no id_field (column defined as a `PRIMARY KEY`)")
         return(None) 
@@ -609,7 +609,7 @@ class Database:
         if get_only:
             fields = get_only
         else:
-            fields = self.get_table_columns(name)
+            fields = self.get_column_names(name)
 
         cols = len(fields)
 
@@ -669,12 +669,12 @@ class Database:
         text = "Tables\n"
         for table_name in table_names:
             text += "\t" + table_name + "\n"
-            for col_name in self.get_table_columns(table_name):
+            for col_name in self.get_column_names(table_name):
                 text += "\t\t" + col_name + "\n"
         print(text)
 
 
-    def get_table_columns(self, name: str) -> list[str]:
+    def get_column_names(self, name: str) -> list[str]:
         """
         Returns the field/column names for a given table
         
@@ -684,11 +684,11 @@ class Database:
             Name of the table.
         """
 
-        keys = []
+        names = []
 
-        for info in self.get_table_info(name):
-            keys.append(list(info)[1])
-        return(keys)
+        for col in self.get_table_cols(name):
+            names.append(col.title)
+        return(names)
 
     def fill_null(self, entry: DatabaseEntry) -> DatabaseEntry:
         """
@@ -700,7 +700,7 @@ class Database:
             The DatabaseEntry.
         """
 
-        t_fields = self.get_table_columns(entry.table)
+        t_fields = self.get_column_names(entry.table)
         e_fields = list(entry)
         for f in e_fields:
             t_fields.remove(f)
@@ -741,7 +741,7 @@ class Database:
             else:
                 raise DatabaseException("Something went very wrong, please contact the package author") # this will never be run... i think
 
-        return(DatabaseEntry.from_raw_entry(answer[0], self.get_table_columns(table), table))
+        return(DatabaseEntry.from_raw_entry(answer[0], self.get_column_names(table), table))
 
     def add_entry(self, entry, table = None, fill_null=False, silent=False) -> None:
         """
@@ -767,7 +767,7 @@ class Database:
         if not self.is_table(entry.table):
             raise DatabaseException(f"Database has no table with the name \"{self.table}\". Possible tablenames are: {self.get_table_names()}")
         
-        table_fields = self.get_table_columns(entry.table)
+        table_fields = self.get_column_names(entry.table)
 
         id_field = self.get_table_id_field(entry.table)
 
@@ -819,7 +819,7 @@ class Database:
             entry = self.fill_null(entry)
 
         # check that entry fields and table fields match
-        table_fields = self.get_table_columns(entry.table)
+        table_fields = self.get_column_names(entry.table)
         if set(table_fields) != set(entry):
             if not (part and set(entry).issubset(set(table_fields))):
                 raise DatabaseException(f"Table fields do not match entry fields: {table_fields} != {list(entry)}. Pass ´part = True´ or ´fill_null = True´ if entry are a subset of the table fields")
@@ -870,7 +870,7 @@ class Database:
         """
 
         cols = {}
-        fields = self.get_table_columns(table)
+        fields = self.get_column_names(table)
 
         for f in fields:
             cols[f] = []
@@ -950,7 +950,7 @@ class Database:
         for table in tables:
             if self.get_table_raw(table) != other.get_table_raw(table):
                 return(False)
-            elif self.get_table_info(table) != other.get_table_info(table):
+            elif self.get_table_cols(table) != other.get_table_cols(table):
                 return(False)
         return(True)
 
@@ -958,5 +958,5 @@ class Database:
 if __name__ == "__main__":
     db = Database("/home/Balder/Projects/slægtsregister/database/slægt.db")
 
-    for l in db.get_table_info("person_marriage"):
+    for l in db.get_table_cols("person_marriage"):
         print(l)
