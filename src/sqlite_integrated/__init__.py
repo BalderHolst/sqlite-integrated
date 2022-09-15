@@ -6,14 +6,34 @@ from dataclasses import dataclass
 
 @dataclass
 class ForeignKey:
+    """Class representing an sql foreign key"""
+
     table: str
+    """The table the foreign key points to"""
+
     to_col: str
+    """Column the foreign key points to"""
+
     from_col: str = None
+    """Column in current table, containing the key value"""
+
     id: int = None
+    """The foreign key id"""
+
     seq: int = None
+    """The foreign key sequence attribute"""
+
     on_update: str = None
+    """The action the key will do if the data it is pointing to changes. (Provide sql action)."""
+
     on_delete: str = None
+    """The action the key will do if the data it is pointing to changes. (Provide sql action)."""
+
     match: str = None
+
+
+    def to_sql(self):
+        return(f"FOREIGN KEY ({self.from_col}) REFERENCES {self.table} ({self.to_col})")
 
 
 # TODO doc
@@ -33,9 +53,6 @@ class Column:
             foreign_key.from_col = title
         self.foreign_key = foreign_key
 
-
-    
-
     def __repr__(self) -> str:
         attrs = []
         if self.col_id:
@@ -49,7 +66,7 @@ class Column:
         if self.primary_key:
             attrs.append("PRIMARY KEY")
         if self.foreign_key:
-            attrs.append(f"FOREIGN KEY ({self.foreign_key.from_col}) REFERENCES {self.foreign_key.table} ({self.foreign_key.to_col})")
+            attrs.append(self.foreign_key.to_sql())
         return(f"Column({', '.join(attrs)})")
 
 
@@ -436,6 +453,7 @@ class Query:
 
 # TODO implement import from csv
 # TODO rewrite sql queries with Query class
+# TODO Create open bool for the Database
 class Database:
     """
     Main database class for manipulating sqlite3 databases
@@ -469,6 +487,7 @@ class Database:
 
         self.conn.execute("PRAGMA foreign_keys = ON")
 
+    # TODO respect: on_update, on_delete, match
     def create_table(self, name: str, cols: list[Column]):
         sql = f"CREATE TABLE {name} (\n"
 
@@ -490,6 +509,32 @@ class Database:
         sql = sql[:-2] + "\n)" # remove last ",\n"
 
         self.cursor.execute(sql)
+
+    def rename_table(self, current_name: str, new_name: str):
+        self.cursor.execute(f"ALTER TABLE {current_name} RENAME TO {new_name}")
+
+
+    def delete_table(self, table_name: str):
+        self.cursor.execute(f"DROP TABLE {table_name}")
+
+    def add_column(self, table_name: str, col: Column):
+
+        sql = f"ALTER TABLE {table_name} ADD COLUMN {col.title} {col.type}" 
+
+        if col.primary_key:
+            sql += " PRIMARY KEY"
+        if col.not_null:
+            sql += " NOT NULL"
+        if col.default_value:
+            sql += f" DEFAULT {col.default_value}"
+        if col.foreign_key:
+            raise DatabaseException(f"Sqlite3 and therefore sqlite-integrated, does not support adding columns with foreign key constraings to existing tables. They have to be declared with the creation of the table.")
+
+        self.cursor.execute(sql)
+
+    def rename_column(self, table_name: str, current_column_name: str, new_column_name: str):
+        self.cursor.execute(f"ALTER TABLE {table_name} RENAME COLUMN {current_column_name} TO {new_column_name}")
+    
 
 
     def get_table_names(self) -> list:
@@ -718,7 +763,7 @@ class Database:
         print(text)
 
 
-    def get_column_names(self, name: str) -> list[str]:
+    def get_column_names(self, table_name: str) -> list[str]:
         """
         Returns the field/column names for a given table
         
@@ -730,9 +775,15 @@ class Database:
 
         names = []
 
-        for col in self.get_table_cols(name):
+        for col in self.get_table_cols(table_name):
             names.append(col.title)
         return(names)
+    
+    def is_column(self, table_name, col_name):
+        print(f"Cols: {self.get_column_names(table_name)}")
+        if col_name in self.get_column_names(table_name):
+            return(True)
+        return(False)
 
     def fill_null(self, entry: DatabaseEntry) -> DatabaseEntry:
         """
@@ -1018,6 +1069,10 @@ if __name__ == "__main__":
         Column("table2_id", "integer", foreign_key=ForeignKey("table1", "id"))
         ])
 
-    for l in db.get_table_cols("table2"):
-        print(l)
+    db.add_column("table2", Column("Added", "text"))
+    db.add_column("table2", Column("test", "integer"))
+
+    print(db.get_column_names("table2"))
+
+    db.close()
 
