@@ -36,28 +36,42 @@ class ForeignKey:
         return(f"FOREIGN KEY ({self.from_col}) REFERENCES {self.table} ({self.to_col})")
 
 
-# TODO doc
 # TODO add type checkting to type parameter
 @dataclass
 class Column:
+    """Class representing en sql column."""
 
-    def __init__(self, title: str, type: str, not_null: bool = None, default_value: any = None, primary_key: bool = False, col_id: int = None, foreign_key: ForeignKey = None) -> None:
-        self.title = title
+    def __init__(self, name: str, type: str, not_null: bool = None, default_value: any = None, primary_key: bool = False, col_id: int = None, foreign_key: ForeignKey = None) -> None:
+
+        self.name = name
+        """Name of the column."""
+
         self.type = type
+        """Type of the data in the column."""
+
         self.not_null = not_null
+        """Sql NOT NULL constraint."""
+
         self.default_value = default_value
+        """Sql DEFAULT. Default value for the column."""
+
         self.primary_key = primary_key
+        """Sql PRIMARY KEY. Automatic column that ensures that every entry has a unique."""
+
         self.col_id = col_id
+        """Id if the column in the table."""
         
         if foreign_key:
-            foreign_key.from_col = title
+            foreign_key.from_col = name
+
         self.foreign_key = foreign_key
+        """ForeignKey object, that representing an sql foreign key."""
 
     def __repr__(self) -> str:
         attrs = []
         if self.col_id:
             attrs.append(str(self.col_id))
-        attrs.append(self.title)
+        attrs.append(self.name)
         attrs.append(self.type)
         if self.not_null:
             attrs.append("NOT NULL")
@@ -494,7 +508,7 @@ class Database:
         foreign_keys = []
 
         for col in cols:
-            sql += f"{col.title} {col.type}"
+            sql += f"{col.name} {col.type}"
 
             if col.primary_key:
                 sql += " PRIMARY KEY"
@@ -519,7 +533,7 @@ class Database:
 
     def add_column(self, table_name: str, col: Column):
 
-        sql = f"ALTER TABLE {table_name} ADD COLUMN {col.title} {col.type}" 
+        sql = f"ALTER TABLE {table_name} ADD COLUMN {col.name} {col.type}" 
 
         if col.primary_key:
             sql += " PRIMARY KEY"
@@ -534,6 +548,23 @@ class Database:
 
     def rename_column(self, table_name: str, current_column_name: str, new_column_name: str):
         self.cursor.execute(f"ALTER TABLE {table_name} RENAME COLUMN {current_column_name} TO {new_column_name}")
+
+    def delete_column(self, table_name: str, col):
+        """
+        Deletes a column in a table.
+
+        Parameters
+        ----------
+        table_name : str
+            Name of the table the column is in.
+        col : str/Column
+            Column, or column name, of the column that should be deleted.
+        """
+
+        if col is Column:
+            col = col.name
+
+        self.cursor.execute(f"ALTER TABLE {table_name} DROP COLUMN {col}")
     
 
 
@@ -607,7 +638,7 @@ class Database:
 
     def get_table_cols(self, name: str) -> list[tuple]:
         """
-        Returns sql information about a table (runs ´PRAGMA TABLE_INFO(name)´).
+        Returns a list of Column objects, that contain information about the table columns.
 
         Parameters 
         ----------
@@ -647,7 +678,7 @@ class Database:
                         )
 
                 for n, col in enumerate(cols):
-                    if col.title == foreign_key.from_col:
+                    if col.name == foreign_key.from_col:
                         cols[n].foreign_key = foreign_key
                         break
                         
@@ -655,7 +686,7 @@ class Database:
 
         return(cols)
 
-    def get_table_id_field(self, table, do_error=False) -> str:
+    def get_table_id_field(self, table: str, do_error=False) -> str:
         """
         Takes a table and returns the name of the field/column marked as a `PRIMARY KEY`. (This function assumes that there is only ONE field marked as a `PRIMARY KEY`)
 
@@ -671,7 +702,7 @@ class Database:
 
         for col in cols:
             if col.primary_key == True: # col_info[5] is 1 if field is a primary key. Otherwise it is 0.
-                return col.title # col_info[1] is the name of the column
+                return col.name # col_info[1] is the name of the column
         if do_error:
             raise DatabaseException(f"The table `{table}` has no id_field (column defined as a `PRIMARY KEY`)")
         return(None) 
@@ -769,18 +800,31 @@ class Database:
         
         Parameters
         ----------
-        name : str
+        table_name : str
             Name of the table.
         """
+
+        if not self.is_table(table_name):
+            raise DatabaseException(f"Can not get column names of non-existing table {table_name!r}.")
 
         names = []
 
         for col in self.get_table_cols(table_name):
-            names.append(col.title)
+            names.append(col.name)
         return(names)
     
-    def is_column(self, table_name, col_name):
-        print(f"Cols: {self.get_column_names(table_name)}")
+    def is_column(self, table_name: str, col_name: str) -> bool:
+        """
+        Returns True if the given column name exists in the given table. Else returns False.
+
+        Parameters
+        ----------
+        table_name : str
+            Name of a table.
+        col_name : str
+            Name of a column that may be in the table.
+        """
+
         if col_name in self.get_column_names(table_name):
             return(True)
         return(False)
@@ -924,6 +968,16 @@ class Database:
         if not silent and not self.silent:
             print(f"updated entry in table \"{entry.table}\": {entry}")
 
+    def delete_entry(self, entry: DatabaseEntry):
+        id_field = self.get_table_id_field(entry.table)
+        sql = f"DELETE FROM {entry.table} WHERE {id_field} = {entry[id_field]}"
+        self.cursor.execute(sql)
+
+
+    def delete_entry_by_id(self, table: str, id: int):
+        id_field = self.get_table_id_field(table)
+        self.cursor.execute(f"DELETE FROM {table} WHERE {id_field} = {id}")
+
         
     def save(self) -> None:
         """Writes any changes to the database file"""
@@ -1057,22 +1111,34 @@ if __name__ == "__main__":
 
     os.remove(path)
 
-    db = Database(path, new=True)
+    db = Database(path, new=True, silent=True)
 
     db.create_table("table1", [
         Column("id", "integer", primary_key=True), 
         Column("col1", "text")
         ])
 
-    db.create_table("table2", [
+    db.create_table("names", [
         Column("id", "integer", primary_key=True), 
-        Column("table2_id", "integer", foreign_key=ForeignKey("table1", "id"))
+        Column("name", "text")
         ])
 
-    db.add_column("table2", Column("Added", "text"))
-    db.add_column("table2", Column("test", "integer"))
+    table = "names"
+    db.add_entry({"name": "bob"}, table)
+    db.add_entry({"name": "boob"}, table)
+    db.add_entry({"name": "angel"}, table)
+    db.add_entry({"name": "freja"}, table)
 
-    print(db.get_column_names("table2"))
+    db.table_overview(table)
+
+    db.delete_entry(db.get_entry_by_id(table, 3))
+    db.delete_entry_by_id(table, 5)
+
+    db.table_overview(table)
+    
+
+    print(db.get_column_names("names"))
 
     db.close()
+
 
