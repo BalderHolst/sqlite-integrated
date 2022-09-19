@@ -225,7 +225,7 @@ class Query:
 
     def __init__(self, db=None, silent=False) -> None:
         
-        self._db = db
+        self._db: Database = db
         """The attached Database"""
 
         self.sql = ""
@@ -314,7 +314,7 @@ class Query:
             The value of the column.
         """
 
-        self.valid_prefixes(["FROM", "SET"])
+        self.valid_prefixes(["FROM", "SET", "DELETE_FROM"])
         self.history.append("WHERE")
         if value != "":
             if value == None:
@@ -419,6 +419,15 @@ class Query:
             raise DatabaseException(f"Data keys: {set(data)} are not a subset of table fields/columns. Unknown keys: {set(data) - set(self.fields)}. Table fields/columns: {set(self.fields)}")
 
         self.sql += f"({', '.join([str(v) for v in list(data)])}) VALUES ({', '.join([str(value_to_sql_value(v)) for v in data.values()])}) "
+        return(self)
+
+    def DELETE_FROM(self, table_name: str):
+        self.valid_prefixes([None])
+        self.history.append("DELETE_FROM")
+        if self._db and not table_name in self._db.get_table_names():
+            raise QueryException(f"Can not perform DELETE FROM on a non-existing table: {table_name!r}")
+        self.table = table_name
+        self.sql = f"DELETE FROM {table_name} "
         return(self)
 
 
@@ -982,14 +991,12 @@ class Database:
 
     def delete_entry(self, entry: DatabaseEntry):
         id_field = self.get_table_id_field(entry.table)
-        sql = f"DELETE FROM {entry.table} WHERE {id_field} = {entry[id_field]}"
-        self.cursor.execute(sql)
+        self.DELETE_FROM(entry.table).WHERE(id_field, entry[id_field]).run()
 
 
     def delete_entry_by_id(self, table: str, id: int):
         id_field = self.get_table_id_field(table)
-        self.cursor.execute(f"DELETE FROM {table} WHERE {id_field} = {id}")
-
+        self.DELETE_FROM(table).WHERE(id_field, id).run()
         
     def save(self) -> None:
         """Writes any changes to the database file"""
@@ -1102,6 +1109,10 @@ class Database:
         """
 
         return(Query(db=self, silent=True).INSERT_INTO(table_name))
+    
+    def DELETE_FROM(self, table_name: str) -> Query:
+        return(Query(db=self, silent=True).DELETE_FROM(table_name))
+
         
     def __eq__(self, other: object) -> bool:
         tables = self.get_table_names()
@@ -1143,14 +1154,18 @@ if __name__ == "__main__":
 
     db.table_overview(table)
 
-    db.create_table("ref_to_names", [
-        Column("id", "integer", primary_key=True),
-        Column("link", "integer", foreign_key=ForeignKey("names", "id", on_delete="set null", on_update="cascade"))
-        ])
+    db.delete_entry(db.get_entry_by_id("names", 3))
+    db.delete_entry_by_id("names", 1)
+    
+    for _ in range(20):
+        db.add_entry({"name": "new"}, "names")
+    
+    db.table_overview(table)
 
-    for c in db.get_table_cols("ref_to_names"):
-        print(c)
+    db.DELETE_FROM(table).WHERE("name", "new").run()
 
+    db.table_overview("names")
+    
     db.close()
 
 
