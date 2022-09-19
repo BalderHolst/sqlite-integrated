@@ -33,10 +33,14 @@ class ForeignKey:
 
 
     def to_sql(self):
-        return(f"FOREIGN KEY ({self.from_col}) REFERENCES {self.table} ({self.to_col})")
+        rep = f"FOREIGN KEY ({self.from_col}) REFERENCES {self.table} ({self.to_col})"
+        if self.on_update:
+            rep += f" ON UPDATE {self.on_update}"
+        if self.on_delete:
+            rep += f" ON DELETE {self.on_delete}"
+        return(rep)
 
 
-# TODO add type checkting to type parameter
 @dataclass
 class Column:
     """Class representing en sql column."""
@@ -465,8 +469,6 @@ class Query:
 
 
 
-# TODO implement import from csv
-# TODO rewrite sql queries with Query class
 # TODO Create open bool for the Database
 class Database:
     """
@@ -496,8 +498,12 @@ class Database:
         self.cursor = self.conn.cursor()
         """The sqlite3 cursor. Use ´cursor.execute(cmd)´ to execute raw sql"""
 
+        self.connected: bool = True
+        """Is true if the Database is connected to a database."""
+
         self.silent=silent
         """Disables all feedback in the form of prints."""
+
 
         self.conn.execute("PRAGMA foreign_keys = ON")
 
@@ -505,7 +511,7 @@ class Database:
     def create_table(self, name: str, cols: list[Column]):
         sql = f"CREATE TABLE {name} (\n"
 
-        foreign_keys = []
+        foreign_keys: list[ForeignKey] = []
 
         for col in cols:
             sql += f"{col.name} {col.type}"
@@ -518,6 +524,12 @@ class Database:
 
         for key in foreign_keys:
             sql += f"FOREIGN KEY({key.from_col}) REFERENCES {key.table}({key.to_col}),\n"
+            
+            if key.on_update:
+                sql = sql[:-2] + f"\nON UPDATE {key.on_update},\n"
+
+            if key.on_delete:
+                sql = sql[:-2] + f"\nON DELETE {key.on_delete},\n"
 
 
         sql = sql[:-2] + "\n)" # remove last ",\n"
@@ -1103,7 +1115,7 @@ class Database:
                 return(False)
         return(True)
 
-
+# TODO delete test code
 if __name__ == "__main__":
     # db = Database("/home/Balder/Projects/slægtsregister/database/slægt.db")
 
@@ -1131,13 +1143,13 @@ if __name__ == "__main__":
 
     db.table_overview(table)
 
-    db.delete_entry(db.get_entry_by_id(table, 3))
-    db.delete_entry_by_id(table, 5)
+    db.create_table("ref_to_names", [
+        Column("id", "integer", primary_key=True),
+        Column("link", "integer", foreign_key=ForeignKey("names", "id", on_delete="set null", on_update="cascade"))
+        ])
 
-    db.table_overview(table)
-    
-
-    print(db.get_column_names("names"))
+    for c in db.get_table_cols("ref_to_names"):
+        print(c)
 
     db.close()
 
