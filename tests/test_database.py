@@ -49,6 +49,7 @@ def test_get_table_raw(db):
     assert isinstance(table[0], tuple)
 
 def test_get_table_raw_and_get_table_columns(db):
+    db: Database
     for table_name in db.get_table_names():
         table = db.get_table_raw(table_name)
         assert len(table[0]) == len(db.get_table_cols(table_name))
