@@ -493,7 +493,7 @@ class Database:
         Disables all feedback in the form of prints 
     """
 
-    def __init__(self, path: str, new = False, silent=False):
+    def __init__(self, path: str, new = False, silent=True):
 
         if not new and not os.path.isfile(path):
             raise(DatabaseException(f"No database file at \"{path}\". If you want to create one, pass \"new=True\""))
@@ -1128,13 +1128,8 @@ class Database:
 
 # TODO delete test code
 if __name__ == "__main__":
-    # db = Database("/home/Balder/Projects/slægtsregister/database/slægt.db")
 
-    path = "tests/tmp.db"
-
-    os.remove(path)
-
-    db = Database(path, new=True, silent=True)
+    db = Database(":memory:", new=True, silent=True)
 
     db.create_table("table1", [
         Column("id", "integer", primary_key=True), 
