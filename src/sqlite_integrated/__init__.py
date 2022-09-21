@@ -40,7 +40,7 @@ class ForeignKey:
             rep += f" ON DELETE {self.on_delete}"
         return(rep)
 
-
+# TODO check that datatype is integer if col is a primary key
 @dataclass
 class Column:
     """Class representing en sql column."""
@@ -523,10 +523,14 @@ class Database:
         foreign_keys: list[ForeignKey] = []
 
         for col in cols:
-            sql += f"{col.name} {col.type}"
+            sql += f"{col.name!r} {col.type}"
 
             if col.primary_key:
                 sql += " PRIMARY KEY"
+            if col.not_null:
+                sql += " NOT NULL"
+            if col.default_value:
+                sql += f" DEFAULT {col.default_value!r}"
             if col.foreign_key:
                 foreign_keys.append(col.foreign_key)
             sql += ",\n"
@@ -554,6 +558,10 @@ class Database:
 
     def add_column(self, table_name: str, col: Column):
 
+        # Check that the table exists
+        if not self.is_table(table_name):
+            raise DatabaseException(f"Database contains no table with the name {table_name!r}")
+
         sql = f"ALTER TABLE {table_name} ADD COLUMN {col.name} {col.type}" 
 
         if col.primary_key:
@@ -568,6 +576,11 @@ class Database:
         self.cursor.execute(sql)
 
     def rename_column(self, table_name: str, current_column_name: str, new_column_name: str):
+
+        # Check that the table exists
+        if not self.is_table(table_name):
+            raise DatabaseException(f"Database contains no table with the name {table_name!r}")
+
         self.cursor.execute(f"ALTER TABLE {table_name} RENAME COLUMN {current_column_name} TO {new_column_name}")
 
     def delete_column(self, table_name: str, col):
@@ -581,6 +594,10 @@ class Database:
         col : str/Column
             Column, or column name, of the column that should be deleted.
         """
+
+        # Check that the table exists
+        if not self.is_table(table_name):
+            raise DatabaseException(f"Database contains no table with the name {table_name!r}")
 
         if col is Column:
             col = col.name

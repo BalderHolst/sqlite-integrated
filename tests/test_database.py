@@ -253,3 +253,60 @@ def test_export_to_csv(db):
     # cleanup
     shutil.rmtree(out_dir)
 
+def test_get_table_info(db):
+    db: Database
+
+    cols = db.get_table_cols("artists")[1]
+    assert isinstance(cols, Column)
+
+def test_column():
+    col = Column("colname", "text", not_null=True, default_value="defname", col_id=9)
+
+    assert col.name == "colname"
+    assert col.type == "text"
+    assert col.not_null == True
+    assert col.default_value == "defname"
+    assert col.col_id == 9
+
+
+
+def test_create_table_and_memory_database():
+    db = Database(":memory:", new=True)
+
+    db.create_table("table1", [
+        Column("id", "integer", primary_key=True),
+        Column("data1", "text"),
+        Column("data2", "text")
+        ])
+
+    db.create_table("table2", [
+        Column("id2", "integer", primary_key=True),
+        Column("data1", "text", not_null=True, default_value="defval"),
+        Column("data2", "text")
+        ])
+
+    assert len(db.get_table_names()) == 2
+    assert db.get_table_cols("table2")[1].not_null == True
+
+def test_add_rename_and_delete_column():
+    db = Database(":memory:", new=True)
+
+    db.create_table("table_name", [
+        Column("id", "integer", primary_key=True),
+        Column("data1", "text"),
+        Column("data2", "text")
+        ])
+
+    cols_before = db.get_table_cols("table_name")
+
+    db.add_column("table_name", Column("added_col", "text"))
+
+    assert len(cols_before) + 1 == len(db.get_table_cols("table_name"))
+
+    db.rename_column("table_name", "added_col", "new_name")
+
+    assert db.get_column_names("table_name")[-1] == "new_name"
+
+    db.delete_column("table_name", "new_name")
+
+    assert len(db.get_table_cols("table_name")) == len(cols_before)
