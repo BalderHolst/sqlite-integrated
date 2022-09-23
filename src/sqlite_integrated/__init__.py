@@ -95,7 +95,7 @@ class DatabaseEntry(dict):
     Parameters
     ----------
     entry_dict : dict
-        A dictionary containing all the information. This information can be accesed just like any other python dict with ´my_entry[my_key]´.
+        A dictionary containing all the information. This information can be accesed just like any other python dict with `my_entry[my_key]`.
     table : str
         The name of the table the entry is a part of
     """
@@ -113,9 +113,9 @@ class DatabaseEntry(dict):
         Parameters
         ----------
         raw_entry : tuple
-            A tuple with the data for the entry. Ex: ´(2, "Tom", "Builder", 33)´
+            A tuple with the data for the entry. Ex: `(2, "Tom", "Builder", 33)`
         table_fields : list
-            A list of column names for the data. Ex: ´["id", "FirstName", "LastName", "Age"]´
+            A list of column names for the data. Ex: `["id", "FirstName", "LastName", "Age"]`
         table_name : str
             The name of the table (in the database) that the data belongs to. Ex: "people"
         """
@@ -125,7 +125,7 @@ class DatabaseEntry(dict):
         if isinstance(table_fields, str):
             table_fields = string_to_list(table_fields)
         elif not isinstance(table_fields, list):
-            raise ValueError(f"table_fields must be either ´list´ or ´str´. Got: {table_fields}")
+            raise ValueError(f"table_fields must be either `list` or `str`. Got: {table_fields}")
 
         if len(raw_entry) != len(table_fields):
             raise DatabaseException(f"There must be as many names for table fields as there are fields in the entry: len({raw_entry}) != len({table_fields}) => {len(raw_entry)} != {len(table_fields)}")
@@ -151,7 +151,7 @@ def raw_table_to_table(raw_table: list, fields: list, table_name: str) -> list[D
     raw_table : list
         A list of tuples with the data for the entries.
     fields : list
-        A list of column names for the data. Ex: ´["id", "FirstName", "LastName", "Age"]´
+        A list of column names for the data. Ex: `["id", "FirstName", "LastName", "Age"]`
     table_name: str
         The name of the table (in the database) that the data belongs to. Ex: "people".
     """
@@ -213,7 +213,7 @@ class QueryException(Exception):
 # TODO implement JOIN and LEFTJOIN (RIGHTJOIN?): https://www.w3schools.com/sql/sql_join.asp
 class Query:
     """
-    A class for writing sql queries. Queries can be run on the attached database or a seperate one with the ´run´ method
+    A class for writing sql queries. Queries can be run on the attached database or a seperate one with the `run` method
 
     Parameters
     ----------
@@ -276,7 +276,7 @@ class Query:
             self.fields = selection
             self.sql += f"SELECT {', '.join(selection)} "
         else:
-            raise QueryException("SELECT statement selection must be either ´str´ or ´list´")
+            raise QueryException("SELECT statement selection must be either `str` or `list`")
         return(self)
 
     def FROM(self, table_name):
@@ -309,7 +309,7 @@ class Query:
         Parameters
         ----------
         col_name : str
-            The name of the column. You can also just pass it a statement like: ´"id" = 4´ instead of providing a value.
+            The name of the column. You can also just pass it a statement like: `"id" = 4` instead of providing a value.
         value : optional
             The value of the column.
         """
@@ -433,7 +433,7 @@ class Query:
 
     def run(self, db=None, raw = False, silent=False) -> list[DatabaseEntry]:
         """
-        Execute the query in the attached database or in a seperate one. Returns the results in a table (list of DatabaseEntry) or ´None´ if no results.
+        Execute the query in the attached database or in a seperate one. Returns the results in a table (list of DatabaseEntry) or `None` if no results.
 
         Parameters
         ----------
@@ -488,7 +488,7 @@ class Database:
     path : str
         Path to the database file
     new : bool, optional
-        A new blank database will be created where the ´self.path´ is pointing
+        A new blank database will be created where the `self.path` is pointing
     silent : bool, optional
         Disables all feedback in the form of prints 
     """
@@ -505,8 +505,9 @@ class Database:
         """The sqlite3 connection."""
 
         self.cursor = self.conn.cursor()
-        """The sqlite3 cursor. Use ´cursor.execute(cmd)´ to execute raw sql"""
+        """The sqlite3 cursor. Use `cursor.execute(cmd)` to execute raw sql"""
 
+        # TODO
         self.connected: bool = True
         """Is true if the Database is connected to a database."""
 
@@ -652,7 +653,7 @@ class Database:
                         raise DatabaseException(f"Table \"{name}\" contains no field/column with the name: \"{field}\". Available fields are: {fields}")
                 selected = ','.join(get_only)
             else:
-                raise ValueError(f"get_only can either be ´None´ or ´list´. Got: {get_only}")
+                raise ValueError(f"get_only can either be `None` or `list`. Got: {get_only}")
         
         self.cursor.execute(f"SELECT {selected} FROM {name}")
         return(self.cursor.fetchall())
@@ -674,7 +675,7 @@ class Database:
         return(raw_table_to_table(raw_table, self.get_column_names(name), name))
 
 
-    def get_table_cols(self, name: str) -> list[tuple]:
+    def get_table_cols(self, name: str) -> list[Column]:
         """
         Returns a list of Column objects, that contain information about the table columns.
 
@@ -814,7 +815,8 @@ class Database:
             
         print(text)
 
-    def overview(self) -> None:
+    #TODO doc more
+    def overview(self, more=False) -> None:
         """Prints an overview of all the tables in the database with their fields."""
 
         table_names = self.get_table_names()
@@ -827,8 +829,11 @@ class Database:
         text = "Tables\n"
         for table_name in table_names:
             text += "\t" + table_name + "\n"
-            for col_name in self.get_column_names(table_name):
-                text += "\t\t" + col_name + "\n"
+            for col in self.get_table_cols(table_name):
+                text += f"\t\t{col.name}"
+                if more:
+                    text += f"\t\t[{col}]"
+                text += "\n"
         print(text)
 
 
@@ -922,7 +927,7 @@ class Database:
 
     def add_entry(self, entry, table = None, fill_null=False, silent=False) -> None:
         """
-        Add an entry to the database by passing a DatabaseEntry, or with a dictionary and specifying a table name. The entry must have values for all fields in the table. You can pass ´fill_null=True´ to fill remaining fields with None/null. Use ´silent=True´ to suppress warnings and messages.
+        Add an entry to the database by passing a DatabaseEntry, or with a dictionary and specifying a table name. The entry must have values for all fields in the table. You can pass `fill_null=True` to fill remaining fields with None/null. Use `silent=True` to suppress warnings and messages.
 
         Parameters
         ----------
@@ -999,7 +1004,7 @@ class Database:
         table_fields = self.get_column_names(entry.table)
         if set(table_fields) != set(entry):
             if not (part and set(entry).issubset(set(table_fields))):
-                raise DatabaseException(f"Table fields do not match entry fields: {table_fields} != {list(entry)}. Pass ´part = True´ or ´fill_null = True´ if entry are a subset of the table fields")
+                raise DatabaseException(f"Table fields do not match entry fields: {table_fields} != {list(entry)}. Pass `part = True` or `fill_null = True` if entry are a subset of the table fields")
 
         self.UPDATE(entry.table).SET(entry).WHERE(id_field, entry[id_field]).run()
 
@@ -1021,7 +1026,7 @@ class Database:
         self.conn.commit()
     
     def close(self) -> None:
-        """Saves and closes the database. If you want to explicitly close without saving use: ´self.conn.close()´"""
+        """Saves and closes the database. If you want to explicitly close without saving use: `self.conn.close()`"""
 
         self.conn.commit()
         self.conn.close()
