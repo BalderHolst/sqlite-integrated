@@ -310,3 +310,43 @@ def test_add_rename_and_delete_column():
     db.delete_column("table_name", "new_name")
 
     assert len(db.get_table_cols("table_name")) == len(cols_before)
+
+def test_DELETE_FROM():
+    db = Database(":memory:", new=True)
+
+    db.create_table("table_name", [
+        Column("id", "integer", primary_key=True),
+        Column("name", "text")
+        ])
+
+    length = 10
+
+
+    for i in range(length):
+        db.add_entry({"name": f"name{i}"}, "table_name")
+
+    db.DELETE_FROM("table_name").WHERE("id", 3).run()
+
+    assert len(db.get_table("table_name")) == length - 1
+    
+def test_is_column(db):
+    db: Database = db
+    assert db.is_column("customers", "FirstName") == True
+    assert db.is_column("customers", "NotaCol") == False
+
+def test_rename_and_delete_table(db):
+    db = Database(":memory:", new=True)
+
+    db.create_table("table1", [
+        Column("id", "integer", primary_key=True),
+        Column("data1", "text"),
+        ])
+
+    db.rename_table("table1", "gamers")
+
+    assert db.is_table("gamers") == True
+    assert db.is_table("table1") == False
+
+    db.delete_table("gamers")
+
+    assert db.is_table("gamers") == False
