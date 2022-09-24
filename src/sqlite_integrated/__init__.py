@@ -422,6 +422,15 @@ class Query:
         return(self)
 
     def DELETE_FROM(self, table_name: str):
+        """
+        Sql `DELETE FROM` statement. Must be followed by `WHERE` statement.
+
+        Parameters
+        ----------
+        data : dict
+            Dictionary with key value pairs.
+        """
+
         self.valid_prefixes([None])
         self.history.append("DELETE_FROM")
         if self._db and not table_name in self._db.get_table_names():
@@ -519,6 +528,17 @@ class Database:
 
     # TODO respect: on_update, on_delete, match
     def create_table(self, name: str, cols: list[Column]):
+        """
+        Creates a table in the Database.
+
+        Parameters
+        ----------
+        name : str
+            Name of the new table.
+        cols : list[Column]
+            List of columns in the new table.
+        """
+
         sql = f"CREATE TABLE {name} (\n"
 
         foreign_keys: list[ForeignKey] = []
@@ -551,13 +571,40 @@ class Database:
         self.cursor.execute(sql)
 
     def rename_table(self, current_name: str, new_name: str):
+        """
+        Renames a table in the database.
+
+        Parameters
+        ----------
+        current_name : str
+            Current name of a table.
+        new_name : str
+            New name of the table.
+        """
         self.cursor.execute(f"ALTER TABLE {current_name} RENAME TO {new_name}")
 
 
-    def delete_table(self, table_name: str):
+    def delete_table(self, table_name: str) -> None:
+        """
+        Deletes a table in the database.
+
+        Parameters
+        ----------
+        table_name : Name of the table.
+        """
         self.cursor.execute(f"DROP TABLE {table_name}")
 
     def add_column(self, table_name: str, col: Column):
+        """
+        Add column to a table in the database.
+
+        Parameters
+        ----------
+        table_name : str
+            Name of the table.
+        col : Column
+            The column to add to table.
+        """
 
         # Check that the table exists
         if not self.is_table(table_name):
@@ -577,6 +624,13 @@ class Database:
         self.cursor.execute(sql)
 
     def rename_column(self, table_name: str, current_column_name: str, new_column_name: str):
+        """
+        Renames a column in the database.
+
+        Parameters
+        ----------
+        table_name : str
+        """
 
         # Check that the table exists
         if not self.is_table(table_name):
@@ -817,7 +871,14 @@ class Database:
 
     #TODO doc more
     def overview(self, more=False) -> None:
-        """Prints an overview of all the tables in the database with their fields."""
+        """
+        Prints an overview of all the tables in the database with their fields.
+
+        Parameters
+        ----------
+        more : optional
+            If true: Prints more information on the columns in each table.
+        """
 
         table_names = self.get_table_names()
 
@@ -1012,11 +1073,31 @@ class Database:
             print(f"updated entry in table \"{entry.table}\": {entry}")
 
     def delete_entry(self, entry: DatabaseEntry):
+        """
+        Delete an entry from the database.
+        
+        Parameters
+        ----------
+        entry : DatabaseEntry
+            The entry that is to be deleted.
+        """
+
         id_field = self.get_table_id_field(entry.table)
         self.DELETE_FROM(entry.table).WHERE(id_field, entry[id_field]).run()
 
 
     def delete_entry_by_id(self, table: str, id: int):
+        """
+        Deletes an entry with a certain id. (Note: the table must have a primary key column, as that is what is meant by id. It is assumed that there is only one primary key column in the table.}
+
+        Parameters
+        ----------
+        table : str
+            The table to delete the entry from.
+        id : int
+            
+        """
+
         id_field = self.get_table_id_field(table)
         self.DELETE_FROM(table).WHERE(id_field, id).run()
         
@@ -1127,12 +1208,20 @@ class Database:
         Parameters
         ----------
         table_name : str
-            Name of the table.
+            Name of the table to insert into.
         """
 
         return(Query(db=self, silent=True).INSERT_INTO(table_name))
     
     def DELETE_FROM(self, table_name: str) -> Query:
+        """
+        Start sql DELETE FROM query from the database. Returns a Query to build from.
+
+        Parameters
+        ----------
+        table_name : str
+            Name of the table to delete from.
+        """
         return(Query(db=self, silent=True).DELETE_FROM(table_name))
 
         
