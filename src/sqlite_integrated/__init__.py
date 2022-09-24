@@ -24,10 +24,10 @@ class ForeignKey:
     """The foreign key sequence attribute"""
 
     on_update: str = None
-    """The action the key will do if the data it is pointing to changes. (Provide sql action)."""
+    """The action the column will do if the data the key is pointing to changes. (Provide sql action)."""
 
     on_delete: str = None
-    """The action the key will do if the data it is pointing to changes. (Provide sql action)."""
+    """The action the column will do if the data the key is pointing to changes. (Provide sql action)."""
 
     match: str = None
 
@@ -90,7 +90,7 @@ class Column:
 
 class DatabaseEntry(dict):
     """
-    A python dictionary that keeps track of the table where it came from. This class is not supposed to be created manually.
+    A python dictionary that keeps track of the table it belongs to. This class is not meant to be created manually.
 
     Parameters
     ----------
@@ -128,7 +128,7 @@ class DatabaseEntry(dict):
             raise ValueError(f"table_fields must be either `list` or `str`. Got: {table_fields}")
 
         if len(raw_entry) != len(table_fields):
-            raise DatabaseException(f"There must be as many names for table fields as there are fields in the entry: len({raw_entry}) != len({table_fields}) => {len(raw_entry)} != {len(table_fields)}")
+            raise DatabaseError(f"There must be as many names for table fields as there are fields in the entry: len({raw_entry}) != len({table_fields}) => {len(raw_entry)} != {len(table_fields)}")
         
         for n, field in enumerate(table_fields):
             entry_dict[field] = raw_entry[n]
@@ -144,7 +144,7 @@ class DatabaseEntry(dict):
 
 def raw_table_to_table(raw_table: list, fields: list, table_name: str) -> list[DatabaseEntry]:
     """
-    Convert a raw table (list of tuples) to a table (list of dictionaries)
+    Convert a raw table (list of tuples) to a table (list of dictionaries).
 
     Parameters
     ----------
@@ -161,7 +161,7 @@ def raw_table_to_table(raw_table: list, fields: list, table_name: str) -> list[D
     if len(raw_table) == 0:
         return([])
     if len(raw_table[0]) != len(fields):
-        raise DatabaseException(f"There must be one raw column per field. {raw_table[0] = }, {fields = }")
+        raise DatabaseError(f"There must be one raw column per field. {raw_table[0] = }, {fields = }")
     
     for raw_entry in raw_table:
         entry = {}
@@ -204,16 +204,16 @@ def dict_to_sql(data: dict) -> str:
     return(", ".join(set_list))
 
 
-class DatabaseException(Exception):
+class DatabaseError(Exception):
     """Raised when the database fails to execute command"""
 
-class QueryException(Exception):
+class QueryError(Exception):
     """Raised when trying to create an invalid or unsupperted query"""
 
 # TODO implement JOIN and LEFTJOIN (RIGHTJOIN?): https://www.w3schools.com/sql/sql_join.asp
 class Query:
     """
-    A class for writing sql queries. Queries can be run on the attached database or a seperate one with the `run` method
+    A class for writing sql queries. Queries can be run on the attached database or a seperate one with the `run` method.
 
     Parameters
     ----------
@@ -251,7 +251,7 @@ class Query:
             prefix = self.history[-1]
         if prefix in prefixes:
             return(True)
-        raise QueryException(f"Query syntax incorrect or not supported. Prefix: \"{prefix}\" is not a part of the valid prefixes: {prefixes}")
+        raise QueryError(f"Query syntax incorrect or not supported. Prefix: \"{prefix}\" is not a part of the valid prefixes: {prefixes}")
 
     def SELECT(self, selection="*"):
         """
@@ -259,7 +259,7 @@ class Query:
             
         Parameters
         ----------
-        selection : str/list
+        selection : str/list, optional
             Either a python list or sql list of table names. Selects all columns if not set.
         """
         
@@ -276,7 +276,7 @@ class Query:
             self.fields = selection
             self.sql += f"SELECT {', '.join(selection)} "
         else:
-            raise QueryException("SELECT statement selection must be either `str` or `list`")
+            raise QueryError("SELECT statement selection must be either `str` or `list`")
         return(self)
 
     def FROM(self, table_name):
@@ -296,7 +296,7 @@ class Query:
             table_fields = set(self._db.get_column_names(table_name)) # check if selected fields are in table
 
         if self.fields != "*" and self._db and not set(self.fields).issubset(table_fields):
-            raise QueryException(f"Some selected field(s): {set(self.fields) - table_fields} are not fields/columns in the table: {table_name!r}. The table has the following fields: {table_fields}")
+            raise QueryError(f"Some selected field(s): {set(self.fields) - table_fields} are not fields/columns in the table: {table_name!r}. The table has the following fields: {table_fields}")
 
         self.history.append("FROM")
         self.sql += f"FROM {table_name} "
@@ -356,7 +356,7 @@ class Query:
         self.history.append("UPDATE")
         if self._db:
             if not self._db.is_table(table_name):
-                raise QueryException(f"Database has no table called {table_name!r}")
+                raise QueryError(f"Database has no table called {table_name!r}")
             self.fields = self._db.get_column_names(table_name)
         self.table = table_name
         self.sql += f"UPDATE {table_name} "
@@ -378,7 +378,7 @@ class Query:
         data = dict(data)
 
         if not set(data).issubset(self.fields):
-            raise DatabaseException(f"Data keys: {set(data)} are not a subset of table fields/columns. Table fields/columns: {set(self.fields)}")
+            raise DatabaseError(f"Data keys: {set(data)} are not a subset of table fields/columns. Table fields/columns: {set(self.fields)}")
         
         self.sql += f"SET {dict_to_sql(data)} "
 
@@ -416,7 +416,7 @@ class Query:
         self.history.append("VALUES")
 
         if not set(data).issubset(self.fields):
-            raise DatabaseException(f"Data keys: {set(data)} are not a subset of table fields/columns. Unknown keys: {set(data) - set(self.fields)}. Table fields/columns: {set(self.fields)}")
+            raise DatabaseError(f"Data keys: {set(data)} are not a subset of table fields/columns. Unknown keys: {set(data) - set(self.fields)}. Table fields/columns: {set(self.fields)}")
 
         self.sql += f"({', '.join([str(v) for v in list(data)])}) VALUES ({', '.join([str(value_to_sql_value(v)) for v in data.values()])}) "
         return(self)
@@ -434,7 +434,7 @@ class Query:
         self.valid_prefixes([None])
         self.history.append("DELETE_FROM")
         if self._db and not table_name in self._db.get_table_names():
-            raise QueryException(f"Can not perform DELETE FROM on a non-existing table: {table_name!r}")
+            raise QueryError(f"Can not perform DELETE FROM on a non-existing table: {table_name!r}")
         self.table = table_name
         self.sql = f"DELETE FROM {table_name} "
         return(self)
@@ -459,12 +459,12 @@ class Query:
             db = self._db
 
         if not db:
-            raise DatabaseException("Query does not have a database to execute")
+            raise DatabaseError("Query does not have a database to execute")
 
         try:
             db.cursor.execute(self.sql)
         except sqlite3.OperationalError as e:
-            raise QueryException(f"\n\n{e}\n\nError while running following sql: {self.sql}")
+            raise QueryError(f"\n\n{e}\n\nError while running following sql: {self.sql}")
 
         if not db.silent and not self.silent and not silent:
             print(f"Executed sql: {self.sql}")
@@ -490,22 +490,22 @@ class Query:
 # TODO Create open bool for the Database
 class Database:
     """
-    Main database class for manipulating sqlite3 databases
+    Main database class for manipulating sqlite3 databases.
 
     Parameters
     ----------
     path : str
-        Path to the database file
+        Path to the database file.
     new : bool, optional
-        A new blank database will be created where the `self.path` is pointing
+        A new blank database will be created where the `self.path` is pointing.
     silent : bool, optional
-        Disables all feedback in the form of prints 
+        Disables all feedback in the form of prints .
     """
 
     def __init__(self, path: str, new = False, silent=True):
 
         if not new and not os.path.isfile(path):
-            raise(DatabaseException(f"No database file at \"{path}\". If you want to create one, pass \"new=True\""))
+            raise(DatabaseError(f"No database file at \"{path}\". If you want to create one, pass \"new=True\""))
 
         self.path = path
         """Path to the database file."""
@@ -514,7 +514,7 @@ class Database:
         """The sqlite3 connection."""
 
         self.cursor = self.conn.cursor()
-        """The sqlite3 cursor. Use `cursor.execute(cmd)` to execute raw sql"""
+        """The sqlite3 cursor. Use `cursor.execute(cmd)` to execute raw sql."""
 
         # TODO
         self.connected: bool = True
@@ -608,7 +608,7 @@ class Database:
 
         # Check that the table exists
         if not self.is_table(table_name):
-            raise DatabaseException(f"Database contains no table with the name {table_name!r}")
+            raise DatabaseError(f"Database contains no table with the name {table_name!r}")
 
         sql = f"ALTER TABLE {table_name} ADD COLUMN {col.name} {col.type}" 
 
@@ -619,7 +619,7 @@ class Database:
         if col.default_value:
             sql += f" DEFAULT {col.default_value}"
         if col.foreign_key:
-            raise DatabaseException(f"Sqlite3 and therefore sqlite-integrated, does not support adding columns with foreign key constraings to existing tables. They have to be declared with the creation of the table.")
+            raise DatabaseError(f"Sqlite3 and therefore sqlite-integrated, does not support adding columns with foreign key constraings to existing tables. They have to be declared with the creation of the table.")
 
         self.cursor.execute(sql)
 
@@ -630,11 +630,16 @@ class Database:
         Parameters
         ----------
         table_name : str
+            Name of the table.
+        current_column_name : str
+            Current name of a column.
+        new_column_name : str
+            New name of the column.
         """
 
         # Check that the table exists
         if not self.is_table(table_name):
-            raise DatabaseException(f"Database contains no table with the name {table_name!r}")
+            raise DatabaseError(f"Database contains no table with the name {table_name!r}")
 
         self.cursor.execute(f"ALTER TABLE {table_name} RENAME COLUMN {current_column_name} TO {new_column_name}")
 
@@ -652,7 +657,7 @@ class Database:
 
         # Check that the table exists
         if not self.is_table(table_name):
-            raise DatabaseException(f"Database contains no table with the name {table_name!r}")
+            raise DatabaseError(f"Database contains no table with the name {table_name!r}")
 
         if col is Column:
             col = col.name
@@ -704,7 +709,7 @@ class Database:
                 fields = self.get_column_names(name)
                 for field in get_only:
                     if not field in fields:
-                        raise DatabaseException(f"Table \"{name}\" contains no field/column with the name: \"{field}\". Available fields are: {fields}")
+                        raise DatabaseError(f"Table \"{name}\" contains no field/column with the name: \"{field}\". Available fields are: {fields}")
                 selected = ','.join(get_only)
             else:
                 raise ValueError(f"get_only can either be `None` or `list`. Got: {get_only}")
@@ -774,21 +779,17 @@ class Database:
                     if col.name == foreign_key.from_col:
                         cols[n].foreign_key = foreign_key
                         break
-                        
-
-
-        return(cols)
 
     def get_table_id_field(self, table: str, do_error=False) -> str:
         """
-        Takes a table and returns the name of the field/column marked as a `PRIMARY KEY`. (This function assumes that there is only ONE field marked as a `PRIMARY KEY`)
+        Takes a table and returns the name of the field/column marked as a `PRIMARY KEY`. (This function assumes that there is only ONE field marked as a `PRIMARY KEY`).
 
         Parameters
         ----------
         table : str
-            Name of the table
+            Name of the table.
         do_error : bool, optional
-            If True: Raises error if the table does not contain a field marked as `PRIMARY KEY`
+            If True: Raises error if the table does not contain a field marked as `PRIMARY KEY`.
         """
 
         cols = self.get_table_cols(table)
@@ -797,7 +798,7 @@ class Database:
             if col.primary_key == True: # col_info[5] is 1 if field is a primary key. Otherwise it is 0.
                 return col.name # col_info[1] is the name of the column
         if do_error:
-            raise DatabaseException(f"The table `{table}` has no id_field (column defined as a `PRIMARY KEY`)")
+            raise DatabaseError(f"The table `{table}` has no id_field (column defined as a `PRIMARY KEY`)")
         return(None) 
 
     def table_overview(self, name: str, max_len:int = 40, get_only = None) -> None:
@@ -811,7 +812,7 @@ class Database:
         max_len : int, optional
             The max number of rows shown.
         get_only : list, optional
-            If given a list of column/field names: only shows those
+            If given a list of column/field names: only shows those.
                 
         """
         
@@ -869,7 +870,6 @@ class Database:
             
         print(text)
 
-    #TODO doc more
     def overview(self, more=False) -> None:
         """
         Prints an overview of all the tables in the database with their fields.
@@ -900,7 +900,7 @@ class Database:
 
     def get_column_names(self, table_name: str) -> list[str]:
         """
-        Returns the field/column names for a given table
+        Returns the field/column names for a given table.
         
         Parameters
         ----------
@@ -909,7 +909,7 @@ class Database:
         """
 
         if not self.is_table(table_name):
-            raise DatabaseException(f"Can not get column names of non-existing table {table_name!r}.")
+            raise DatabaseError(f"Can not get column names of non-existing table {table_name!r}.")
 
         names = []
 
@@ -935,7 +935,7 @@ class Database:
 
     def fill_null(self, entry: DatabaseEntry) -> DatabaseEntry:
         """
-        Fills out any unpopulated fields in a DatabaseEntry (fields that exist in the database table but not in the entry).
+        Fills out any unpopulated fields in a DatabaseEntry (fields that exist in the database table but not in the entry) and returns it.
 
         Parameters
         ----------
@@ -967,7 +967,7 @@ class Database:
         id_field = self.get_table_id_field(table, do_error=True)
 
         if not self.is_table(table):
-            raise DatabaseException(f"Database contains no table with the name: \"{table}\". These are the available tables: {self.get_table_names()}")
+            raise DatabaseError(f"Database contains no table with the name: \"{table}\". These are the available tables: {self.get_table_names()}")
 
         sql = f"SELECT * FROM {table} WHERE {id_field} = {ID}"
 
@@ -978,11 +978,11 @@ class Database:
         # some checks
         if len(answer) != 1:
             if len(answer) > 1:
-                raise DatabaseException(f"There are more than one entry in table \"{table}\" with an id field \"{id_field}\" with the value \"{id}\": {answer}")
+                raise DatabaseError(f"There are more than one entry in table \"{table}\" with an id field \"{id_field}\" with the value \"{id}\": {answer}")
             elif len(answer) == 0:
-                raise DatabaseException(f"There is no entry in table \"{table}\" with an id_field \"{id_field}\" with a value of {ID}")
+                raise DatabaseError(f"There is no entry in table \"{table}\" with an id_field \"{id_field}\" with a value of {ID}")
             else:
-                raise DatabaseException("Something went very wrong, please contact the package author") # this will never be run... i think
+                raise DatabaseError("Something went very wrong, please contact the package author") # this will never be run... i think
 
         return(DatabaseEntry.from_raw_entry(answer[0], self.get_column_names(table), table))
 
@@ -1004,11 +1004,11 @@ class Database:
 
         if type(entry) == dict:
             if not table:
-                raise DatabaseException(f"Please provide the table that the data should be inserted in.")
+                raise DatabaseError(f"Please provide the table that the data should be inserted in.")
             entry = DatabaseEntry(entry, table)
 
         if not self.is_table(entry.table):
-            raise DatabaseException(f"Database has no table with the name \"{self.table}\". Possible tablenames are: {self.get_table_names()}")
+            raise DatabaseError(f"Database has no table with the name \"{self.table}\". Possible tablenames are: {self.get_table_names()}")
         
         table_fields = self.get_column_names(entry.table)
 
@@ -1022,7 +1022,7 @@ class Database:
             entry = self.fill_null(entry)
 
         if set(entry) != set(table_fields):
-            raise DatabaseException(f"entry fields are not the same as the table fields: {set(entry)} != {set(table_fields)}")
+            raise DatabaseError(f"entry fields are not the same as the table fields: {set(entry)} != {set(table_fields)}")
 
         self.INSERT_INTO(entry.table).VALUES(entry).run(silent=True)
 
@@ -1050,13 +1050,13 @@ class Database:
 
         if not isinstance(entry, DatabaseEntry): # the input is a dict
             if not table:
-                raise DatabaseException(f"Please provide a table when updating an entry with a python dictionary")
+                raise DatabaseError(f"Please provide a table when updating an entry with a python dictionary")
             entry = DatabaseEntry(entry, table) 
 
         id_field = self.get_table_id_field(entry.table)
 
         if not self.is_table(entry.table):
-            raise DatabaseException(f"Database has no table with the name \"{entry.table}\". Possible tablenames are: {self.get_table_names()}")
+            raise DatabaseError(f"Database has no table with the name \"{entry.table}\". Possible tablenames are: {self.get_table_names()}")
 
         if fill_null:
             entry = self.fill_null(entry)
@@ -1065,7 +1065,7 @@ class Database:
         table_fields = self.get_column_names(entry.table)
         if set(table_fields) != set(entry):
             if not (part and set(entry).issubset(set(table_fields))):
-                raise DatabaseException(f"Table fields do not match entry fields: {table_fields} != {list(entry)}. Pass `part = True` or `fill_null = True` if entry are a subset of the table fields")
+                raise DatabaseError(f"Table fields do not match entry fields: {table_fields} != {list(entry)}. Pass `part = True` or `fill_null = True` if entry are a subset of the table fields")
 
         self.UPDATE(entry.table).SET(entry).WHERE(id_field, entry[id_field]).run()
 
@@ -1236,42 +1236,3 @@ class Database:
             elif self.get_table_cols(table) != other.get_table_cols(table):
                 return(False)
         return(True)
-
-# TODO delete test code
-if __name__ == "__main__":
-
-    db = Database(":memory:", new=True, silent=True)
-
-    db.create_table("table1", [
-        Column("id", "integer", primary_key=True), 
-        Column("col1", "text")
-        ])
-
-    db.create_table("names", [
-        Column("id", "integer", primary_key=True), 
-        Column("name", "text")
-        ])
-
-    table = "names"
-    db.add_entry({"name": "bob"}, table)
-    db.add_entry({"name": "boob"}, table)
-    db.add_entry({"name": "angel"}, table)
-    db.add_entry({"name": "freja"}, table)
-
-    db.table_overview(table)
-
-    db.delete_entry(db.get_entry_by_id("names", 3))
-    db.delete_entry_by_id("names", 1)
-    
-    for _ in range(20):
-        db.add_entry({"name": "new"}, "names")
-    
-    db.table_overview(table)
-
-    db.DELETE_FROM(table).WHERE("name", "new").run()
-
-    db.table_overview("names")
-    
-    db.close()
-
-
