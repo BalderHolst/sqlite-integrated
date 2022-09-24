@@ -5,11 +5,11 @@ with open("README.md", "r") as f:
 
 setuptools.setup(
     name = "sqlite-integrated",
-    version = "0.0.3",
+    version = "0.0.4",
     author = "Balder Holst",
     author_email = "balderwh@gmail.com",
     packages = ["sqlite_integrated"],
-    description = "Easily manipulate sqlite databases with simple syntax",
+    description = "Easily manipulate sqlite3 databases with simple syntax",
     long_description = description,
     long_description_content_type = "text/markdown",
     url = "https://github.com/BalderHolst/sqlite-integrated",
@@ -26,11 +26,10 @@ setuptools.setup(
     python_requires = ">=3.7",
     install_requires = [
         "pandas>=1.3.5",
-        "numpy>=1.21.5",
         ],
     extras_require={
             'dev': [
-                'pytest',
+                'pytest'
             ]
         }
     )
