@@ -19,8 +19,8 @@ If you are interested in the open source code, click [here](https://github.com/B
 ### Creating a new database
 Start by importing the class and creating our NEW database (remember to put in a valid path to the database file).
 ```python
-from sqlite_integrated import Database
-db = Database("path/database.db", new=True)
+from sqlite_integrated import *
+db = Database("path/to/database.db", new=True)
 ```
 
 We pass `new=True` to create a new database file.
