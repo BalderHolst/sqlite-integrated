@@ -25,7 +25,7 @@ db = Database("path/to/database.db", new=True)
 
 We pass `new=True` to create a new database file.
 
-We can now create a table with sql. Note that we create a column assigned as "PRIMARY KEY". Every table should have one of these columns. It makes sure that every entry has a unique id, so that we can keep track of it.
+We can now create a table with sql. Note that we create a column assigned as "PRIMARY KEY" with the `primary_key` flag. Every table should have one of these columns (for this package to work properly). It makes sure that every entry has a unique id, so that we can keep track of it.
 
 ```python
 db.create_table("people", [
