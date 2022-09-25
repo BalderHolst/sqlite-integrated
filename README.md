@@ -20,7 +20,7 @@ If you are interested in the open source code, click [here](https://github.com/B
 Start by importing the class and creating our NEW database (remember to put in a valid path to the database file).
 ```python
 from sqlite_integrated import Database
-db = Database("path/to/database.db", new=True)
+db = Database("path/database.dbto/database.db", new=True)
 ```
 
 We pass `new=True` to create a new database file.
@@ -28,11 +28,11 @@ We pass `new=True` to create a new database file.
 We can now create a table with sql. Note that we create a column assigned as "PRIMARY KEY". Every table should have one of these columns. It makes sure that every entry has a unique id, so that we can keep track of it.
 
 ```python
-db.cursor.execute("""CREATE TABLE people (
-id integer PRIMARY KEY,
-first_name text,
-last_name text
-)""")
+db.create_table("people", [
+    Column("id", "integer", primary_key=True),
+    Column("first_name", "text"),
+    Column("last_name", "text")
+])
 ```
 
 We can see an overview of the tables in the database and their table fields with the method `overview`. 
@@ -82,7 +82,7 @@ id ║ first_name ║ last_name
 Start by importing the class and opening our database.
 ```python
 from sqlite_integrated import Database
-db = Database("path/to/database.db")
+db = Database("tests/test.db")
 ```
 
 Just to check you can now run.
@@ -123,7 +123,7 @@ To save these changes to the database file, use the `save` method.
 from sqlite_integrated import Database
 
 # Loading an existing database
-db = Database("path/to/database.db")
+db = Database("tests/test.db")
 
 db.table_overview("customers", max_len=15, get_only=["FirstName", "LastName", "Address", "City"])
 ```
@@ -153,6 +153,59 @@ Puja      ║ Srivastava   ║ 3,Raj Bhavan Road                        ║ Bang
 
 ```
 
+### Creating a database in memory
+```python
+from sqlite_integrated import Database
+
+# remember to pass new=True
+db = Database(":memory:", new=True)
+```
+
+### Creating a table with foreign keys
+```python
+# importing the classes
+from sqlite_integrated import Database
+from sqlite_integrated import Column
+from sqlite_integrated import ForeignKey
+
+# Creating a database in memory
+db = Database(":memory:", new=True)
+
+# Creating a table of people
+db.create_table("people", [
+    Column("PersonId", "integer", primary_key=True),
+    Column("PersonName", "text")
+])
+
+# Creating a table of groups 
+db.create_table("groups", [
+    Column("GroupId", "integer", primary_key=True),
+    Column("GroupName", "text")
+])
+
+# A table that links people and the groups they are part off
+db.create_table("person_group", [
+    Column("PersonId", "integer", foreign_key=ForeignKey("people", "PersonId", on_update="CASCADE", on_delete="SET NULL"))
+])
+
+# use more=True to show more column information
+db.overview(more=True)
+```
+
+*Output:*
+```
+Tables
+	people
+		PersonId		[Column(PersonId, integer, PRIMARY KEY)]
+		PersonName		[Column(1, PersonName, text)]
+	groups
+		GroupId		[Column(GroupId, integer, PRIMARY KEY)]
+		GroupName		[Column(1, GroupName, text)]
+	person_group
+		PersonId		[Column(PersonId, integer, FOREIGN KEY (PersonId) REFERENCES people (PersonId) ON UPDATE CASCADE ON DELETE SET NULL)]
+
+```
+
 ### Using queries
 
 #### Select Statement
@@ -160,7 +213,7 @@ Puja      ║ Srivastava   ║ 3,Raj Bhavan Road                        ║ Bang
 from sqlite_integrated import Database
 
 # Loading an existing database
-db = Database("path/to/database.db")
+db = Database("tests/test.db")
 
 # Select statement
 query = db.SELECT(["FirstName"]).FROM("customers").WHERE("FirstName").LIKE("T%")
@@ -188,7 +241,7 @@ By default the database prints the sql that is executed in the database, to the 
 from sqlite_integrated import Database
 
 # Loading an existing database
-db = Database("path/to/database.db")
+db = Database("tests/test.db")
 
 # Metadata for the entry we are adding
 entry = {"FirstName": "Test", "LastName": "Testing", "Email": "test@testing.com"}
@@ -200,29 +253,28 @@ db.INSERT_INTO("customers").VALUES(entry).run()
 print("\n")
 
 # Print the table 
-db.table_overview("customers", get_only=["CustomerId", "FirstName", "LastName", "Email", "Company", "City"], max_len=10)
+db.table_overview("customers", get_only=["CustomerId", "FirstName", "LastName", "Email", "City"], max_len=10)
 ```
 
 *Output:*
 ```
-Executed sql: INSERT INTO customers (FirstName, LastName, Email) VALUES ('Test', 'Testing', 'test@testing.com') 
 
 
-CustomerId ║ FirstName ║ LastName     ║ Email                         ║ Company                                          ║ City               
-═══════════╬═══════════╬══════════════╬═══════════════════════════════╬══════════════════════════════════════════════════╬══════════════════
-1          ║ Luís      ║ Gonçalves    ║ luisg@embraer.com.br          ║ Embraer - Empresa Brasileira de Aeronáutica S.A. ║ São José dos Campos
-2          ║ Leonie    ║ Köhler       ║ leonekohler@surfeu.de         ║ None                                             ║ Stuttgart          
-3          ║ François  ║ Tremblay     ║ ftremblay@gmail.com           ║ None                                             ║ Montréal           
-4          ║ Bjørn     ║ Hansen       ║ bjorn.hansen@yahoo.no         ║ None                                             ║ Oslo               
-5          ║ František ║ Wichterlová  ║ frantisekw@jetbrains.com      ║ JetBrains s.r.o.                                 ║ Prague             
+CustomerId ║ FirstName ║ LastName     ║ Email                         ║ City               
+═══════════╬═══════════╬══════════════╬═══════════════════════════════╬═══════════════════
+1          ║ Luís      ║ Gonçalves    ║ luisg@embraer.com.br          ║ São José dos Campos
+2          ║ Leonie    ║ Köhler       ║ leonekohler@surfeu.de         ║ Stuttgart          
+3          ║ François  ║ Tremblay     ║ ftremblay@gmail.com           ║ Montréal           
+4          ║ Bjørn     ║ Hansen       ║ bjorn.hansen@yahoo.no         ║ Oslo               
+5          ║ František ║ Wichterlová  ║ frantisekw@jetbrains.com      ║ Prague             
     .
     .
     .
-56         ║ Diego     ║ Gutiérrez    ║ diego.gutierrez@yahoo.ar      ║ None                                             ║ Buenos Aires       
-57         ║ Luis      ║ Rojas        ║ luisrojas@yahoo.cl            ║ None                                             ║ Santiago           
-58         ║ Manoj     ║ Pareek       ║ manoj.pareek@rediff.com       ║ None                                             ║ Delhi              
-59         ║ Puja      ║ Srivastava   ║ puja_srivastava@yahoo.in      ║ None                                             ║ Bangalore          
-60         ║ Test      ║ Testing      ║ test@testing.com              ║ None                                             ║ None               
+56         ║ Diego     ║ Gutiérrez    ║ diego.gutierrez@yahoo.ar      ║ Buenos Aires       
+57         ║ Luis      ║ Rojas        ║ luisrojas@yahoo.cl            ║ Santiago           
+58         ║ Manoj     ║ Pareek       ║ manoj.pareek@rediff.com       ║ Delhi              
+59         ║ Puja      ║ Srivastava   ║ puja_srivastava@yahoo.in      ║ Bangalore          
+60         ║ Test      ║ Testing      ║ test@testing.com              ║ None               
 
 ```
 
@@ -231,10 +283,10 @@ CustomerId ║ FirstName ║ LastName     ║ Email                         ║ 
 from sqlite_integrated import Database
 
 # Loading an existing database
-db = Database("path/to/database.db")
+db = Database("tests/test.db")
 
 # Printing an overview of the customers table
-db.table_overview("customers", get_only=["CustomerId", "FirstName", "LastName", "Email", "Company", "City"], max_len=10)
+db.table_overview("customers", get_only=["CustomerId", "FirstName", "LastName", "City"], max_len=10)
 
 # Some space
 print()
@@ -246,45 +298,107 @@ db.UPDATE("customers").SET({"FirstName": "Brian", "LastName": "Brianson"}).WHERE
 print()
 
 # Printing an overview of the updated customers table
-db.table_overview("customers", get_only=["CustomerId", "FirstName", "LastName", "Email", "Company", "City"], max_len=10)
+db.table_overview("customers", get_only=["CustomerId", "FirstName", "LastName", "City"], max_len=10)
 ```
 
 *Output:*
 ```
-CustomerId ║ FirstName ║ LastName     ║ Email                         ║ Company                                          ║ City               
-═══════════╬═══════════╬══════════════╬═══════════════════════════════╬══════════════════════════════════════════════════╬══════════════════
-1          ║ Luís      ║ Gonçalves    ║ luisg@embraer.com.br          ║ Embraer - Empresa Brasileira de Aeronáutica S.A. ║ São José dos Campos
-2          ║ Leonie    ║ Köhler       ║ leonekohler@surfeu.de         ║ None                                             ║ Stuttgart          
-3          ║ François  ║ Tremblay     ║ ftremblay@gmail.com           ║ None                                             ║ Montréal           
-4          ║ Bjørn     ║ Hansen       ║ bjorn.hansen@yahoo.no         ║ None                                             ║ Oslo               
-5          ║ František ║ Wichterlová  ║ frantisekw@jetbrains.com      ║ JetBrains s.r.o.                                 ║ Prague             
+CustomerId ║ FirstName ║ LastName     ║ City               
+═══════════╬═══════════╬══════════════╬════════════════════
+1          ║ Luís      ║ Gonçalves    ║ São José dos Campos
+2          ║ Leonie    ║ Köhler       ║ Stuttgart          
+3          ║ François  ║ Tremblay     ║ Montréal           
+4          ║ Bjørn     ║ Hansen       ║ Oslo               
+5          ║ František ║ Wichterlová  ║ Prague             
     .
     .
     .
-55         ║ Mark      ║ Taylor       ║ mark.taylor@yahoo.au          ║ None                                             ║ Sidney             
-56         ║ Diego     ║ Gutiérrez    ║ diego.gutierrez@yahoo.ar      ║ None                                             ║ Buenos Aires       
-57         ║ Luis      ║ Rojas        ║ luisrojas@yahoo.cl            ║ None                                             ║ Santiago           
-58         ║ Manoj     ║ Pareek       ║ manoj.pareek@rediff.com       ║ None                                             ║ Delhi              
-59         ║ Puja      ║ Srivastava   ║ puja_srivastava@yahoo.in      ║ None                                             ║ Bangalore          
+55         ║ Mark      ║ Taylor       ║ Sidney             
+56         ║ Diego     ║ Gutiérrez    ║ Buenos Aires       
+57         ║ Luis      ║ Rojas        ║ Santiago           
+58         ║ Manoj     ║ Pareek       ║ Delhi              
+59         ║ Puja      ║ Srivastava   ║ Bangalore          
 
 
-Executed sql: UPDATE customers SET FirstName = 'Brian', LastName = 'Brianson' WHERE FirstName LIKE 'L%' 
 
-CustomerId ║ FirstName ║ LastName     ║ Email                         ║ Company                                          ║ City               
-═══════════╬═══════════╬══════════════╬═══════════════════════════════╬══════════════════════════════════════════════════╬══════════════════
-1          ║ Brian     ║ Brianson     ║ luisg@embraer.com.br          ║ Embraer - Empresa Brasileira de Aeronáutica S.A. ║ São José dos Campos
-2          ║ Brian     ║ Brianson     ║ leonekohler@surfeu.de         ║ None                                             ║ Stuttgart          
-3          ║ François  ║ Tremblay     ║ ftremblay@gmail.com           ║ None                                             ║ Montréal           
-4          ║ Bjørn     ║ Hansen       ║ bjorn.hansen@yahoo.no         ║ None                                             ║ Oslo               
-5          ║ František ║ Wichterlová  ║ frantisekw@jetbrains.com      ║ JetBrains s.r.o.                                 ║ Prague             
+CustomerId ║ FirstName ║ LastName     ║ City               
+═══════════╬═══════════╬══════════════╬════════════════════
+1          ║ Brian     ║ Brianson     ║ São José dos Campos
+2          ║ Brian     ║ Brianson     ║ Stuttgart          
+3          ║ François  ║ Tremblay     ║ Montréal           
+4          ║ Bjørn     ║ Hansen       ║ Oslo               
+5          ║ František ║ Wichterlová  ║ Prague             
     .
     .
     .
-55         ║ Mark      ║ Taylor       ║ mark.taylor@yahoo.au          ║ None                                             ║ Sidney             
-56         ║ Diego     ║ Gutiérrez    ║ diego.gutierrez@yahoo.ar      ║ None                                             ║ Buenos Aires       
-57         ║ Brian     ║ Brianson     ║ luisrojas@yahoo.cl            ║ None                                             ║ Santiago           
-58         ║ Manoj     ║ Pareek       ║ manoj.pareek@rediff.com       ║ None                                             ║ Delhi              
-59         ║ Puja      ║ Srivastava   ║ puja_srivastava@yahoo.in      ║ None                                             ║ Bangalore          
+55         ║ Mark      ║ Taylor       ║ Sidney             
+56         ║ Diego     ║ Gutiérrez    ║ Buenos Aires       
+57         ║ Brian     ║ Brianson     ║ Santiago           
+58         ║ Manoj     ║ Pareek       ║ Delhi              
+59         ║ Puja      ║ Srivastava   ║ Bangalore          
+
+```
+
+### Delete queries
+```python
+from sqlite_integrated import Database
+from sqlite_integrated import Query
+from sqlite_integrated import Column
+
+# Creating a database in memory
+db = Database(":memory:", new=True)
+
+# Adding a table of people
+db.create_table("people", [
+    Column("id", "integer", primary_key=True),
+    Column("name", "text")
+])
+
+# Adding a few people
+db.add_entry({"name": "Peter"}, "people")
+db.add_entry({"name": "Anna"}, "people")
+db.add_entry({"name": "Tom"}, "people")
+db.add_entry({"name": "Mads"}, "people")
+db.add_entry({"name": "Simon"}, "people")
+db.add_entry({"name": "Emillie"}, "people")
+db.add_entry({"name": "Mathias"}, "people")
+db.add_entry({"name": "Jakob"}, "people")
+
+# ids of entries to delete
+ids = [1,2,5,7]
+
+print("Before deletion:")
+db.table_overview("people", max_len=10)
+
+# Deletes the ids from the 'people' table
+for c_id in ids:
+    db.DELETE_FROM("people").WHERE("id", c_id).run()
+
+print("After deletion:")
+db.table_overview("people", max_len=10)
+```
+
+*Output:*
+```
+Before deletion:
+id ║ name   
+═══╬══════════
+1  ║ Peter  
+2  ║ Anna   
+3  ║ Tom    
+4  ║ Mads   
+5  ║ Simon  
+6  ║ Emillie
+7  ║ Mathias
+8  ║ Jakob  
+
+After deletion:
+id ║ name   
+═══╬══════════
+3  ║ Tom    
+4  ║ Mads   
+6  ║ Emillie
+8  ║ Jakob  
 
 ```
 
@@ -294,10 +408,10 @@ from sqlite_integrated import Database
 from sqlite_integrated import Query
 
 # Loading an existing database
-db1 = Database("path/to/database.db")
+db1 = Database("tests/test.db")
 
 # Loading the same database to a different variable
-db2 = Database("path/to/database.db")
+db2 = Database("tests/test.db")
 
 # Updating the first entry in the first database only
 db1.UPDATE("customers").SET({"FirstName": "Allan", "LastName": "Changed"}).WHERE("CustomerId", 1).run()
@@ -316,9 +430,6 @@ print(f"\ndb2 output: {out2}")
 
 *Output:*
 ```
-Executed sql: UPDATE customers SET FirstName = 'Allan', LastName = 'Changed' WHERE CustomerId = 1
-Executed sql: SELECT * FROM customers WHERE CustomerId = 1 
-Executed sql: SELECT * FROM customers WHERE CustomerId = 1 
 
 db1 output: [DatabaseEntry(table: customers, data: {'CustomerId': 1, 'FirstName': 'Allan', 'LastName': 'Changed', 'Company': 'Embraer - Empresa Brasileira de Aeronáutica S.A.', 'Address': 'Av. Brigadeiro Faria Lima, 2170', 'City': 'São José dos Campos', 'State': 'SP', 'Country': 'Brazil', 'PostalCode': '12227-000', 'Phone': '+55 (12) 3923-5555', 'Fax': '+55 (12) 3923-5566', 'Email': 'luisg@embraer.com.br', 'SupportRepId': 3})]
 
