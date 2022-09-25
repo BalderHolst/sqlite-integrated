@@ -779,6 +779,7 @@ class Database:
                     if col.name == foreign_key.from_col:
                         cols[n].foreign_key = foreign_key
                         break
+        return(cols)
 
     def get_table_id_field(self, table: str, do_error=False) -> str:
         """

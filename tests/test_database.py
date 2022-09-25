@@ -15,7 +15,7 @@ def db() -> Database:
 # ================== TESTS ===================
 
 def test_creating_database():
-    with pytest.raises(DatabaseException):
+    with pytest.raises(DatabaseError):
         Database("does_not_exist.db")
 
 def test_creating_database_and_table():
@@ -107,10 +107,10 @@ def test_update_entry(db):
     assert entry == entry_from_table
 
     # Need either part=True or fill_null=True
-    with pytest.raises(DatabaseException):
+    with pytest.raises(DatabaseError):
         db.update_entry({}, "customers")
 
-    with pytest.raises(DatabaseException):
+    with pytest.raises(DatabaseError):
         db.update_entry(DatabaseEntry({}, "customers"))
 
     # Part = True
