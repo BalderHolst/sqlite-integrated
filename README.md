@@ -20,7 +20,7 @@ If you are interested in the open source code, click [here](https://github.com/B
 Start by importing the class and creating our NEW database (remember to put in a valid path to the database file).
 ```python
 from sqlite_integrated import Database
-db = Database("path/database.dbto/database.db", new=True)
+db = Database("path/database.db", new=True)
 ```
 
 We pass `new=True` to create a new database file.
