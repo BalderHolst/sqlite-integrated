@@ -1031,6 +1031,10 @@ class Database:
             print(f"added entry to table \"{entry.table}\": {entry}")
 
 
+        self.cursor.execute("SELECT last_insert_rowid()")
+        return (self.cursor.fetchall()[0][0])
+
+
     def update_entry(self, entry: dict, table=None, part=False, fill_null=False, silent=False) -> None:
         """
         Update entry in database with a DatabaseEntry, or with a dictionary + the name of the table you want to update.
