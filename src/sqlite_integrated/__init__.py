@@ -180,7 +180,7 @@ def value_to_sql_value(value) -> str:
     """Converts python values to sql values. Basically just puts quotes around strings and not ints or floats. Also converts None to null"""
 
     if isinstance(value, str):
-        return(value.__repr__())
+        return("'" + value.replace("'", "''") + "'")
     elif isinstance(value, int):
         return(str(value))
     elif isinstance(value, float):
