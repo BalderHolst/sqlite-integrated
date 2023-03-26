@@ -9,7 +9,7 @@ pip install sqlite-integrated
 ```
 
 # Read the documentation
-The documentation can be found [here](https://htmlpreview.github.io/?https://github.com/BalderHolst/sqlite-integrated/blob/main/docs/sqlite_integrated/index.html).
+The documentation can be found [here](https://balderholst.com/docs/sqlite-integrated).
 
 # Github Repo
 If you are interested in the open source code, click [here](https://github.com/BalderHolst/sqlite-integrated).
