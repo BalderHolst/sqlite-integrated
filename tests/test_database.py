@@ -392,3 +392,10 @@ def test_memory_database():
     db = Database.in_memory(verbose=True)
     assert isinstance(db, Database)
 
+def test_run_raw_sql(db):
+    db: Database = db
+
+    res = db.run_raw_sql("select * from customers")
+
+    assert isinstance(res, list)
+    assert isinstance(res[0], tuple)

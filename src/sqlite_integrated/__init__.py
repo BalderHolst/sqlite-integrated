@@ -454,7 +454,6 @@ class Query:
             Be verbose about it.
         """
 
-        
         if not db:
             db = self._db
 
@@ -1201,6 +1200,27 @@ class Database:
             df = self.table_to_dataframe(table_name)
             df.to_csv(f"{out_dir}/{table_name}.csv", index=False, sep=sep)
 
+    def run_raw_sql(self, sql: str, verbose=False):
+        """
+        Run SQL-string on the database. This returns a raw table as list of tuples.
+
+        Parameters
+        ----------
+        sql : str
+            SQL-string to be execured as an SQL command.
+        verbose : bool, optional
+            Prints the SQL-query if true
+        """
+
+        try:
+            self.cursor.execute(sql)
+        except sqlite3.OperationalError as e:
+            raise QueryError(f"\n\n{e}\n\nError while running following sql: {self.sql}")
+
+        if verbose or self.verbose:
+            print(f"Executed sql: {self.sql}")
+
+        return(self.cursor.fetchall())
 
     def SELECT(self, pattern="*") -> Query:
         """
