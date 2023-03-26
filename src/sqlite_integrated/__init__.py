@@ -485,7 +485,6 @@ class Query:
 
 
 
-# TODO Create open bool for the Database
 class Database:
     """
     Main database class for manipulating sqlite3 databases.
@@ -514,13 +513,11 @@ class Database:
         self.cursor = self.conn.cursor()
         """The sqlite3 cursor. Use `cursor.execute(cmd)` to execute raw sql."""
 
-        # TODO
         self.connected: bool = True
-        """Is true if the Database is connected to a database."""
+        """Is true if the `Database` instance is connected to a database."""
 
         self.verbose=verbose
         """Enables feedback in the form of prints."""
-
 
         self.conn.execute("PRAGMA foreign_keys = ON")
 
@@ -1119,12 +1116,14 @@ class Database:
 
         self.conn.commit()
         self.conn.close()
+        self.connected = False
 
     def reconnect(self) -> None:
         """Reopen database after closing it"""
 
         self.conn = sqlite3.connect(self.path)
         self.cursor = self.conn.cursor()
+        self.connected = True
 
     def delete_table(self, table_name) -> None:
         """
