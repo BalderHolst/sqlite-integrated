@@ -377,3 +377,12 @@ def test_rename_and_delete_table(db):
     db.delete_table("gamers")
 
     assert db.is_table("gamers") == False
+
+def test_primary_key_type():
+    Column("name", "integer", primary_key=True)
+    Column("name", "INTEGER", primary_key=True)
+
+    with pytest.raises(DatabaseError):
+        Column("name", "int", primary_key=True)
+        Column("name", "INT", primary_key=True)
+
