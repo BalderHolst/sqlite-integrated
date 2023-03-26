@@ -8,7 +8,7 @@ from sqlite_integrated import *
 @pytest.fixture
 def db() -> Database:
     shutil.copy("tests/test.db", "tests/temp.db")
-    yield Database("tests/temp.db", silent=True)
+    yield Database("tests/temp.db")
     os.remove("tests/temp.db")
 
 
