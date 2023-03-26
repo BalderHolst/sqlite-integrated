@@ -987,7 +987,11 @@ class Database:
 
     def add_entry(self, entry, table = None, fill_null=False, silent=False) -> None:
         """
-        Add an entry to the database by passing a DatabaseEntry, or with a dictionary and specifying a table name. The entry must have values for all fields in the table. You can pass `fill_null=True` to fill remaining fields with None/null. Use `silent=True` to suppress warnings and messages.
+        Add an entry to the database by passing a DatabaseEntry, or with a dictionary and specifying a table name. 
+
+        Returns the id of the added DatabaseEntry in the table, or `None` if table does not contain a primary key.
+
+        The entry must have values for all fields in the table. You can pass `fill_null=True` to fill any remaining fields with `None`/`null`. Use `silent=True` to suppress warnings and messages.
 
         Parameters
         ----------
@@ -1016,7 +1020,6 @@ class Database:
         if id_field:
             entry[id_field] = None
         
-
         if fill_null:
             entry = self.fill_null(entry)
 
@@ -1028,6 +1031,8 @@ class Database:
         if not silent and not self.silent:
             print(f"added entry to table \"{entry.table}\": {entry}")
 
+        if not self.get_table_id_field(table):
+            return None
 
         self.cursor.execute("SELECT last_insert_rowid()")
         return (self.cursor.fetchall()[0][0])

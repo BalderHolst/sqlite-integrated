@@ -95,6 +95,34 @@ def test_add_entry(db):
 
     assert len(after_after_table) == len(before_table) + 2
 
+def test_add_entry_return_id():
+    db = Database(":memory:", new=True)
+
+    db.create_table("test_no_id", [
+        Column("name", "text"),
+        Column("test_id", "integer")
+        ])
+
+    entry = {"name": "testname", "test_id": 5}
+
+    assert db.add_entry(entry, "test_no_id") == None
+
+    db.create_table("test_with_id", [
+        Column("name", "text"),
+        Column("test_id", "integer", primary_key=True)
+        ])
+
+    assert db.add_entry(entry, "test_with_id") == 1
+    assert db.add_entry(entry, "test_with_id") == 2
+
+    db.delete_entry_by_id("test_with_id", 1)
+
+    assert db.add_entry(entry, "test_with_id") == 3
+
+    db.delete_entry_by_id("test_with_id", 2)
+    db.delete_entry_by_id("test_with_id", 3)
+
+    assert db.add_entry(entry, "test_with_id") == 1
 
 def test_update_entry(db):
     entry = db.get_entry_by_id("customers", 1)
