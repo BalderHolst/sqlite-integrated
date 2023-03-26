@@ -539,7 +539,6 @@ class Database:
         """
         return Database(":memory:", new=True, verbose=verbose)
 
-    # TODO respect: on_update, on_delete, match
     def create_table(self, name: str, cols: list[Column]):
         """
         Creates a table in the Database.
