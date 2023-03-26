@@ -5,7 +5,7 @@ with open("README.md", "r") as f:
 
 setuptools.setup(
     name = "sqlite-integrated",
-    version = "0.0.5",
+    version = "0.0.6",
     author = "Balder Holst",
     author_email = "balderwh@gmail.com",
     packages = ["sqlite_integrated"],
@@ -29,7 +29,8 @@ setuptools.setup(
         ],
     extras_require={
             'dev': [
-                'pytest'
+                'pytest',
+                'pdoc'
             ]
         }
     )
