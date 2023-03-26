@@ -1,1 +1,1 @@
-pdoc -f -o docs --html src/sqlite_integrated
+pdoc -o docs/sqlite_integrated src/sqlite_integrated
