@@ -499,7 +499,7 @@ class Database:
         Enables feedback in the form of prints.
     """
 
-    def __init__(self, path: str, new = False, verbose=False):
+    def __init__(self, path: str, new = False, verbose=False, silent=None):
 
         if not new and not os.path.isfile(path):
             raise(DatabaseError(f"No database file at \"{path}\". If you want to create one, pass \"new=True\""))
@@ -520,6 +520,10 @@ class Database:
         """Enables feedback in the form of prints."""
 
         self.conn.execute("PRAGMA foreign_keys = ON")
+
+        # Deprecation notice
+        if isinstance(silent, bool):
+            print("[DEPRECATION] `silent` has been removed in favor of `verbose`. The `verbose` option is `False` by default.\n")
 
     # TODO respect: on_update, on_delete, match
     def create_table(self, name: str, cols: list[Column]):
