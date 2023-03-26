@@ -217,11 +217,11 @@ class Query:
     ----------
     db : Database, optional
         The attached Database. This is the default database to run queries on.
-    silent : bool, optional
-        If true: disables prints.
+    verbose : bool, optional
+        Print what is going on in the `Query`
     """
 
-    def __init__(self, db=None, silent=False) -> None:
+    def __init__(self, db=None, verbose=False) -> None:
         
         self._db: Database = db
         """The attached Database"""
@@ -238,8 +238,8 @@ class Query:
         self.table = None
         """The table the sql query is interacting with"""
 
-        self.silent = silent
-        """If true: disables prints"""
+        self.verbose = verbose
+        """Print what is going on in the `Query`"""
 
     def valid_prefixes(self, prefixes: list) -> None:
         """Check if a statement is valid given its prefix"""
@@ -438,7 +438,7 @@ class Query:
         return(self)
 
 
-    def run(self, db=None, raw = False, silent=False) -> list[DatabaseEntry]:
+    def run(self, db=None, raw = False, verbose=False) -> list[DatabaseEntry]:
         """
         Execute the query in the attached database or in a seperate one. Returns the results in a table (generator of DatabaseEntry) or `None` if no results.
 
@@ -448,8 +448,8 @@ class Query:
             The database to execute to query on.
         raw : bool, optional
             If True: returns the raw table (list of tuples) instead of the normal table.
-        silent : bool, optional
-            If True: disables all prints.
+        verbose : bool, optional
+            Be verbose about it.
         """
 
         
@@ -464,7 +464,7 @@ class Query:
         except sqlite3.OperationalError as e:
             raise QueryError(f"\n\n{e}\n\nError while running following sql: {self.sql}")
 
-        if not db.silent and not self.silent and not silent:
+        if verbose or self.verbose or db.verbose:
             print(f"Executed sql: {self.sql}")
 
         results = db.cursor.fetchall()
@@ -496,11 +496,11 @@ class Database:
         Path to the database file.
     new : bool, optional
         A new blank database will be created where the `self.path` is pointing.
-    silent : bool, optional
-        Disables all feedback in the form of prints .
+    verbose : bool, optional
+        Enables feedback in the form of prints.
     """
 
-    def __init__(self, path: str, new = False, silent=True):
+    def __init__(self, path: str, new = False, verbose=False):
 
         if not new and not os.path.isfile(path):
             raise(DatabaseError(f"No database file at \"{path}\". If you want to create one, pass \"new=True\""))
@@ -518,8 +518,8 @@ class Database:
         self.connected: bool = True
         """Is true if the Database is connected to a database."""
 
-        self.silent=silent
-        """Disables all feedback in the form of prints."""
+        self.verbose=verbose
+        """Enables feedback in the form of prints."""
 
 
         self.conn.execute("PRAGMA foreign_keys = ON")
@@ -985,13 +985,13 @@ class Database:
 
         return(DatabaseEntry.from_raw_entry(answer[0], self.get_column_names(table), table))
 
-    def add_entry(self, entry, table = None, fill_null=False, silent=False) -> None:
+    def add_entry(self, entry, table = None, fill_null=False, verbose=False) -> None:
         """
         Add an entry to the database by passing a DatabaseEntry, or with a dictionary and specifying a table name. 
 
         Returns the id of the added DatabaseEntry in the table, or `None` if table does not contain a primary key.
 
-        The entry must have values for all fields in the table. You can pass `fill_null=True` to fill any remaining fields with `None`/`null`. Use `silent=True` to suppress warnings and messages.
+        The entry must have values for all fields in the table. You can pass `fill_null=True` to fill any remaining fields with `None`/`null`.
 
         Parameters
         ----------
@@ -1001,8 +1001,8 @@ class Database:
             Name of the table the entry belongs to. **Needed if adding an entry with a dictionary**.
         fill_null : bool, optional
             Fill in unpopulated fields with null values.
-        silent : bool, optional
-            If True: disables prints.
+        verbose : bool, optional
+            Enable prints.
         """
 
         if type(entry) == dict:
@@ -1026,9 +1026,9 @@ class Database:
         if set(entry) != set(table_fields):
             raise DatabaseError(f"entry fields are not the same as the table fields: {set(entry)} != {set(table_fields)}")
 
-        self.INSERT_INTO(entry.table).VALUES(entry).run(silent=True)
+        self.INSERT_INTO(entry.table).VALUES(entry).run()
 
-        if not silent and not self.silent:
+        if verbose or self.verbose:
             print(f"added entry to table \"{entry.table}\": {entry}")
 
         if not self.get_table_id_field(table):
@@ -1038,7 +1038,7 @@ class Database:
         return (self.cursor.fetchall()[0][0])
 
 
-    def update_entry(self, entry: dict, table=None, part=False, fill_null=False, silent=False) -> None:
+    def update_entry(self, entry: dict, table=None, part=False, fill_null=False, verbose=False) -> None:
         """
         Update entry in database with a DatabaseEntry, or with a dictionary + the name of the table you want to update.
 
@@ -1052,8 +1052,8 @@ class Database:
             If True: Only updates the provided fields.
         fill_null : bool, optional
             Fill in unpopulated fields with null values.
-        silent : bool, optional
-            If True: disables prints.
+        verbose : bool, optional
+            Enable prints.
         """
 
         if not isinstance(entry, DatabaseEntry): # the input is a dict
@@ -1077,7 +1077,7 @@ class Database:
 
         self.UPDATE(entry.table).SET(entry).WHERE(id_field, entry[id_field]).run()
 
-        if not silent and not self.silent:
+        if verbose or self.verbose:
             print(f"updated entry in table \"{entry.table}\": {entry}")
 
     def delete_entry(self, entry: DatabaseEntry):
@@ -1196,7 +1196,7 @@ class Database:
             Either a python list or sql list of table names.
         """
 
-        return(Query(db=self, silent=True).SELECT(pattern))
+        return(Query(db=self, verbose=True).SELECT(pattern))
 
     def UPDATE(self, table_name) -> Query:
         """
@@ -1207,7 +1207,7 @@ class Database:
         table_name : str
             Name of the table.
         """
-        return(Query(db=self, silent=True).UPDATE(table_name))
+        return(Query(db=self, verbose=True).UPDATE(table_name))
 
     def INSERT_INTO(self, table_name) -> Query:
         """
@@ -1219,7 +1219,7 @@ class Database:
             Name of the table to insert into.
         """
 
-        return(Query(db=self, silent=True).INSERT_INTO(table_name))
+        return(Query(db=self, verbose=True).INSERT_INTO(table_name))
     
     def DELETE_FROM(self, table_name: str) -> Query:
         """
@@ -1230,7 +1230,7 @@ class Database:
         table_name : str
             Name of the table to delete from.
         """
-        return(Query(db=self, silent=True).DELETE_FROM(table_name))
+        return(Query(db=self, verbose=True).DELETE_FROM(table_name))
 
         
     def __eq__(self, other: object) -> bool:
