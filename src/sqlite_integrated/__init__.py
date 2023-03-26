@@ -40,12 +40,14 @@ class ForeignKey:
             rep += f" ON DELETE {self.on_delete}"
         return(rep)
 
-# TODO check that datatype is integer if col is a primary key
 @dataclass
 class Column:
     """Class representing en sql column."""
 
     def __init__(self, name: str, type: str, not_null: bool = None, default_value: any = None, primary_key: bool = False, col_id: int = None, foreign_key: ForeignKey = None) -> None:
+
+        if primary_key and type.upper() != "INTEGER":
+            raise DatabaseError(f"Primary key columns must have sqlite type: `INTEGER` not \'{type}\'")
 
         self.name = name
         """Name of the column."""
@@ -70,6 +72,7 @@ class Column:
 
         self.foreign_key = foreign_key
         """ForeignKey object, that representing an sql foreign key."""
+
 
     def __repr__(self) -> str:
         attrs = []
