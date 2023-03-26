@@ -144,7 +144,7 @@ class DatabaseEntry(dict):
 
 def raw_table_to_table(raw_table: list, fields: list, table_name: str) -> list[DatabaseEntry]:
     """
-    Convert a raw table (list of tuples) to a table (list of dictionaries).
+    Convert a raw table (list of tuples) to a table (generator of DatabaseEntry).
 
     Parameters
     ----------
@@ -156,9 +156,8 @@ def raw_table_to_table(raw_table: list, fields: list, table_name: str) -> list[D
         The name of the table (in the database) that the data belongs to. Ex: "people".
     """
 
-    table = []
-
     if len(raw_table) == 0:
+        raise NotImplemented
         return([])
     if len(raw_table[0]) != len(fields):
         raise DatabaseError(f"There must be one raw column per field. {raw_table[0] = }, {fields = }")
@@ -167,8 +166,7 @@ def raw_table_to_table(raw_table: list, fields: list, table_name: str) -> list[D
         entry = {}
         for n, field in enumerate(fields):
             entry[field] = raw_entry[n]
-        table.append(DatabaseEntry(entry, table_name))
-    return(table)
+        yield DatabaseEntry(entry, table_name)
 
 
 def string_to_list(string: str) -> list:
@@ -442,7 +440,7 @@ class Query:
 
     def run(self, db=None, raw = False, silent=False) -> list[DatabaseEntry]:
         """
-        Execute the query in the attached database or in a seperate one. Returns the results in a table (list of DatabaseEntry) or `None` if no results.
+        Execute the query in the attached database or in a seperate one. Returns the results in a table (generator of DatabaseEntry) or `None` if no results.
 
         Parameters
         ----------
@@ -719,7 +717,7 @@ class Database:
 
     def get_table(self, name: str, get_only=None) -> list:
         """
-        Returns all entries in a table as a table (list of DatabaseEntry). This function loops over all entries in the table, so it is not the best in very big databases.
+        Returns all entries in a table as a table (generator of DatabaseEntry). This function loops over all entries in the table, so it is not the best in very big databases.
 
         Parameters
         ----------
