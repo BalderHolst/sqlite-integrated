@@ -1,4 +1,3 @@
-from numpy import isin
 import pytest
 import shutil
 import os
@@ -64,6 +63,26 @@ def test_get_table(db):
     assert isinstance(table, list)
     assert isinstance(table[0], DatabaseEntry)
     assert table[0].table == table_name
+
+def test_get_empty_table():
+    db = Database.in_memory()
+ 
+    db.create_table("test", [
+        Column("id", "integer", primary_key=True),
+        Column("name", "text")
+        ])
+
+    for e in db.get_table("test"):
+        print(e)
+        assert False
+
+def test_get_empty_table_query(db):
+    db: Database = db
+
+    res = db.SELECT().FROM("customers").WHERE("FirstName", "NoOne").run()
+
+    for r in res:
+        assert False
 
 def test_null_fill(db):
     table_name = "customers"

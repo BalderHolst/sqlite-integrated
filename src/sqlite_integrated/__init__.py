@@ -159,8 +159,7 @@ def raw_table_to_table(raw_table: list, fields: list, table_name: str) -> list[D
     """
 
     if len(raw_table) == 0:
-        raise NotImplemented
-        return([])
+        return
     if len(raw_table[0]) != len(fields):
         raise DatabaseError(f"There must be one raw column per field. {raw_table[0] = }, {fields = }")
     
@@ -470,8 +469,6 @@ class Query:
 
         results = db.cursor.fetchall()
 
-        if len(results) == 0:
-            return(None)
         if raw:
             return(results)
 
