@@ -31,7 +31,6 @@ class ForeignKey:
 
     match: str = None
 
-
     def to_sql(self):
         rep = f"FOREIGN KEY ({self.from_col}) REFERENCES {self.table} ({self.to_col})"
         if self.on_update:
@@ -1202,7 +1201,7 @@ class Database:
             Either a python list or sql list of table names.
         """
 
-        return(Query(db=self, verbose=True).SELECT(pattern))
+        return(Query(db=self).SELECT(pattern))
 
     def UPDATE(self, table_name) -> Query:
         """
@@ -1213,7 +1212,7 @@ class Database:
         table_name : str
             Name of the table.
         """
-        return(Query(db=self, verbose=True).UPDATE(table_name))
+        return(Query(db=self).UPDATE(table_name))
 
     def INSERT_INTO(self, table_name) -> Query:
         """
@@ -1225,7 +1224,7 @@ class Database:
             Name of the table to insert into.
         """
 
-        return(Query(db=self, verbose=True).INSERT_INTO(table_name))
+        return(Query(db=self).INSERT_INTO(table_name))
     
     def DELETE_FROM(self, table_name: str) -> Query:
         """
@@ -1236,7 +1235,7 @@ class Database:
         table_name : str
             Name of the table to delete from.
         """
-        return(Query(db=self, verbose=True).DELETE_FROM(table_name))
+        return(Query(db=self).DELETE_FROM(table_name))
 
         
     def __eq__(self, other: object) -> bool:
