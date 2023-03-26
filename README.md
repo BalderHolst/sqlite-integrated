@@ -14,6 +14,8 @@ The documentation can be found [here](https://htmlpreview.github.io/?https://git
 # Github Repo
 If you are interested in the open source code, click [here](https://github.com/BalderHolst/sqlite-integrated).
 
+See the latest changes and features of versin 0.0.6 [here](https://github.com/BalderHolst/sqlite-integrated/blob/dev/features.md).
+
 # How to use it!
 
 ### Creating a new database
@@ -25,11 +27,11 @@ db = Database("path/to/database.db", new=True)
 
 We pass `new=True` to create a new database file.
 
-We can now create a table with sql. Note that we create a column assigned as "PRIMARY KEY" with the `primary_key` flag. Every table should have one of these columns (for this package to work properly). It makes sure that every entry has a unique id, so that we can keep track of it.
+We can now create a table with SQL. Note that we create a column assigned as "PRIMARY KEY" with the `primary_key` flag. Every table should have one of these columns (for this package to work properly). It makes sure that every entry has a unique id, so that we can keep track of it.
 
 ```python
 db.create_table("people", [
-    Column("id", "integer", primary_key=True),
+    Column("person_id", "integer", primary_key=True),
     Column("first_name", "text"),
     Column("last_name", "text")
 ])
@@ -45,7 +47,7 @@ db.overview()
 ```
 Tables
 	people
-		id
+		person_id
 		first_name
 		last_name
 ```
@@ -69,13 +71,17 @@ db.table_overview("people")
 
 *Output:*
 ```
-id ║ first_name ║ last_name
-═══╬════════════╬═══════════
-1  ║ John       ║ Smith    
-2  ║ Tom        ║ Builder  
-3  ║ Eva        ║ Larson   
+person_id ║ first_name ║ last_name
+══════════╬════════════╬═══════════
+1         ║ John       ║ Smith    
+2         ║ Tom        ║ Builder  
+3         ║ Eva        ║ Larson   
 ```
 
+Save your changes with `save`:
+```python
+db.save()
+```
 
 ### Opening an existing database
 
@@ -91,6 +97,10 @@ db.overview()
 ```
 This will print list of all tables in the database.
 
+Save and close the database with `close`:
+```python
+db.close()
+```
 
 ### Editing an entry
 
@@ -157,8 +167,7 @@ Puja      ║ Srivastava   ║ 3,Raj Bhavan Road                        ║ Bang
 ```python
 from sqlite_integrated import Database
 
-# remember to pass new=True
-db = Database(":memory:", new=True)
+db = Database.in_memory()
 ```
 
 ### Creating a table with foreign keys
@@ -169,7 +178,7 @@ from sqlite_integrated import Column
 from sqlite_integrated import ForeignKey
 
 # Creating a database in memory
-db = Database(":memory:", new=True)
+db = Database.in_memory()
 
 # Creating a table of people
 db.create_table("people", [
@@ -213,7 +222,7 @@ Tables
 from sqlite_integrated import Database
 
 # Loading an existing database
-db = Database("tests/test.db")
+db = Database("tests/test.db", verbose=True)
 
 # Select statement
 query = db.SELECT(["FirstName"]).FROM("customers").WHERE("FirstName").LIKE("T%")
@@ -222,7 +231,7 @@ query = db.SELECT(["FirstName"]).FROM("customers").WHERE("FirstName").LIKE("T%")
 print(f"query: {query}")
 
 # Running the query and printing the results
-print(f"Results: {query.run()}")
+print(f"Results: {list(query.run())}")
 ```
 
 *Output:*
@@ -234,14 +243,14 @@ Results: [DatabaseEntry(table: customers, data: {'FirstName': 'Tim'}), DatabaseE
 
 We can see that there are only two customers with a first name that starts with 't'.
 
-By default the database prints the sql that is executed in the database, to the terminal. This can be disabled by passing `silent=True` to the `run` method.
+By default the database prints the SQL that is executed in the database, to the terminal. This can be disabled by passing `silent=True` to the `run` method.
 
 #### Insert Statement
 ```python
 from sqlite_integrated import Database
 
 # Loading an existing database
-db = Database("tests/test.db")
+db = Database("tests/test.db", verbose = True)
 
 # Metadata for the entry we are adding
 entry = {"FirstName": "Test", "LastName": "Testing", "Email": "test@testing.com"}
@@ -250,7 +259,7 @@ entry = {"FirstName": "Test", "LastName": "Testing", "Email": "test@testing.com"
 db.INSERT_INTO("customers").VALUES(entry).run()
 
 # A little space
-print("\n")
+print()
 
 # Print the table 
 db.table_overview("customers", get_only=["CustomerId", "FirstName", "LastName", "Email", "City"], max_len=10)
@@ -258,7 +267,7 @@ db.table_overview("customers", get_only=["CustomerId", "FirstName", "LastName", 
 
 *Output:*
 ```
-
+Executed sql: INSERT INTO customers (FirstName, LastName, Email) VALUES ('Test', 'Testing', 'test@testing.com') 
 
 CustomerId ║ FirstName ║ LastName     ║ Email                         ║ City               
 ═══════════╬═══════════╬══════════════╬═══════════════════════════════╬═══════════════════
@@ -346,7 +355,7 @@ from sqlite_integrated import Query
 from sqlite_integrated import Column
 
 # Creating a database in memory
-db = Database(":memory:", new=True)
+db = Database.in_memory()
 
 # Adding a table of people
 db.create_table("people", [
@@ -408,10 +417,10 @@ from sqlite_integrated import Database
 from sqlite_integrated import Query
 
 # Loading an existing database
-db1 = Database("tests/test.db")
+db1 = Database("tests/test.db", verbose = True)
 
 # Loading the same database to a different variable
-db2 = Database("tests/test.db")
+db2 = Database("tests/test.db", verbose = True)
 
 # Updating the first entry in the first database only
 db1.UPDATE("customers").SET({"FirstName": "Allan", "LastName": "Changed"}).WHERE("CustomerId", 1).run()
@@ -420,20 +429,25 @@ db1.UPDATE("customers").SET({"FirstName": "Allan", "LastName": "Changed"}).WHERE
 query = Query().SELECT().FROM("customers").WHERE("CustomerId = 1")
 
 # Running the query on each database and printing the output.
-out1 = query.run(db1)
-out2 = query.run(db2)
+out1 = list(query.run(db1))
+out2 = list(query.run(db2))
 
 # Printing the outputs
-print(f"\ndb1 output: {out1}")
-print(f"\ndb2 output: {out2}")
+print(f"\ndb1 output:\n{out1}")
+print(f"\ndb2 output:\n{out2}")
 ```
 
 *Output:*
 ```
+Executed sql: UPDATE customers SET FirstName = 'Allan', LastName = 'Changed' WHERE CustomerId = 1
+Executed sql: SELECT * FROM customers WHERE CustomerId = 1 
+Executed sql: SELECT * FROM customers WHERE CustomerId = 1 
 
-db1 output: [DatabaseEntry(table: customers, data: {'CustomerId': 1, 'FirstName': 'Allan', 'LastName': 'Changed', 'Company': 'Embraer - Empresa Brasileira de Aeronáutica S.A.', 'Address': 'Av. Brigadeiro Faria Lima, 2170', 'City': 'São José dos Campos', 'State': 'SP', 'Country': 'Brazil', 'PostalCode': '12227-000', 'Phone': '+55 (12) 3923-5555', 'Fax': '+55 (12) 3923-5566', 'Email': 'luisg@embraer.com.br', 'SupportRepId': 3})]
+db1 output:
+[DatabaseEntry(table: customers, data: {'CustomerId': 1, 'FirstName': 'Allan', 'LastName': 'Changed', 'Company': 'Embraer - Empresa Brasileira de Aeronáutica S.A.', 'Address': 'Av. Brigadeiro Faria Lima, 2170', 'City': 'São José dos Campos', 'State': 'SP', 'Country': 'Brazil', 'PostalCode': '12227-000', 'Phone': '+55 (12) 3923-5555', 'Fax': '+55 (12) 3923-5566', 'Email': 'luisg@embraer.com.br', 'SupportRepId': 3})]
 
-db2 output: [DatabaseEntry(table: customers, data: {'CustomerId': 1, 'FirstName': 'Luís', 'LastName': 'Gonçalves', 'Company': 'Embraer - Empresa Brasileira de Aeronáutica S.A.', 'Address': 'Av. Brigadeiro Faria Lima, 2170', 'City': 'São José dos Campos', 'State': 'SP', 'Country': 'Brazil', 'PostalCode': '12227-000', 'Phone': '+55 (12) 3923-5555', 'Fax': '+55 (12) 3923-5566', 'Email': 'luisg@embraer.com.br', 'SupportRepId': 3})]
+db2 output:
+[DatabaseEntry(table: customers, data: {'CustomerId': 1, 'FirstName': 'Luís', 'LastName': 'Gonçalves', 'Company': 'Embraer - Empresa Brasileira de Aeronáutica S.A.', 'Address': 'Av. Brigadeiro Faria Lima, 2170', 'City': 'São José dos Campos', 'State': 'SP', 'Country': 'Brazil', 'PostalCode': '12227-000', 'Phone': '+55 (12) 3923-5555', 'Fax': '+55 (12) 3923-5566', 'Email': 'luisg@embraer.com.br', 'SupportRepId': 3})]
 ```
 
 # Contributing
