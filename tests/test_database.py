@@ -1,3 +1,4 @@
+from numpy import isin
 import pytest
 import shutil
 import os
@@ -385,4 +386,9 @@ def test_primary_key_type():
     with pytest.raises(DatabaseError):
         Column("name", "int", primary_key=True)
         Column("name", "INT", primary_key=True)
+        Column("name", "text", primary_key=True)
+
+def test_memory_database():
+    db = Database.in_memory(verbose=True)
+    assert isinstance(db, Database)
 

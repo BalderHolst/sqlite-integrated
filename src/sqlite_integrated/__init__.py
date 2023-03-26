@@ -527,6 +527,18 @@ class Database:
         if isinstance(silent, bool):
             print("[DEPRECATION] `silent` has been removed in favor of `verbose`. The `verbose` option is `False` by default.\n")
 
+    @classmethod
+    def in_memory(cls, verbose=False):
+        """
+        Create a database in memory. Returns the `Database` instance.
+
+        Parameters
+        ----------
+        verbose : bool, optional
+            Enables feedback in the form of prints.
+        """
+        return Database(":memory:", new=True, verbose=verbose)
+
     # TODO respect: on_update, on_delete, match
     def create_table(self, name: str, cols: list[Column]):
         """
