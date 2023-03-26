@@ -57,7 +57,7 @@ def test_get_table_raw_and_get_table_columns(db):
 def test_get_table(db):
     table_name = "customers"
     raw_table = db.get_table_raw(table_name)
-    table = db.get_table(table_name)
+    table = list(db.get_table(table_name))
 
     assert len(raw_table) == len(table)
     assert isinstance(table, list)
@@ -69,12 +69,12 @@ def test_null_fill(db):
     entry = DatabaseEntry({"FirstName": "TestName"}, table_name)
     filled_entry = db.fill_null(entry)
 
-    assert len(filled_entry) == len(db.get_table(table_name)[0])
+    assert len(filled_entry) == len(list(db.get_table(table_name))[0])
 
 def test_get_entry_by_id(db):
     table_name = "customers"
     entry_by_id = db.get_entry_by_id(table_name, 1)
-    entry_by_table = DatabaseEntry(db.get_table(table_name)[0], table_name)
+    entry_by_table = DatabaseEntry(list(db.get_table(table_name))[0], table_name)
 
     assert len(entry_by_id) == len(entry_by_table)
     assert entry_by_id == entry_by_table
@@ -83,15 +83,15 @@ def test_add_entry(db):
     table_name = "customers"
     entry = DatabaseEntry({"FirstName": "TestFirstName", "LastName": "TestLastName", "Email": "TestEmail"}, table_name)
 
-    before_table = db.get_table(table_name)
+    before_table = list(db.get_table(table_name))
     db.add_entry(entry, fill_null=True)
-    after_table = db.get_table(table_name)
+    after_table = list(db.get_table(table_name))
 
     assert len(after_table) == len(before_table) + 1
     assert entry['FirstName'] == after_table[-1]['FirstName']
 
     db.add_entry(DatabaseEntry({"FirstName": "SecondTestName", "LastName": "Laaaaaaast", "Email": "Random@email.com"}, table_name), fill_null=True)
-    after_after_table = db.get_table(table_name)
+    after_after_table = list(db.get_table(table_name))
 
     assert len(after_after_table) == len(before_table) + 2
 
@@ -101,7 +101,7 @@ def test_update_entry(db):
     entry['FirstName'] = "TestName"
     db.update_entry(entry)
 
-    entry_from_table = db.get_table("customers")[0]
+    entry_from_table = list(db.get_table("customers"))[0]
 
     assert entry_from_table['FirstName'] == "TestName"
     assert entry == entry_from_table
@@ -117,15 +117,15 @@ def test_update_entry(db):
     db.update_entry(DatabaseEntry({"CustomerId": 1, "FirstName": "TestFirstName", "LastName": "TestLastName", "Email": "TestEmail"}, "customers"), part=True)
     db.update_entry({"CustomerId": 2, "FirstName": "TestSecondFirstName", "LastName": "TestLastName", "Email": "TestEmail"}, "customers", part=True)
 
-    assert db.get_table("customers")[0]['FirstName'] == "TestFirstName"
-    assert db.get_table("customers")[1]['FirstName'] == "TestSecondFirstName"
+    assert list(db.get_table("customers"))[0]['FirstName'] == "TestFirstName"
+    assert list(db.get_table("customers"))[1]['FirstName'] == "TestSecondFirstName"
 
     # fill_null = True
     db.update_entry(DatabaseEntry({"CustomerId": 3, "FirstName": "test1", "LastName": "TestLastName", "Email": "TestEmail"}, "customers"), fill_null=True)
     db.update_entry({"CustomerId": 4, "FirstName": "test2", "LastName": "TestLastName", "Email": "TestEmail"}, "customers", fill_null=True)
 
-    assert db.get_table("customers")[2]['FirstName'] == "test1"
-    assert db.get_table("customers")[3]['FirstName'] == "test2"
+    assert list(db.get_table("customers"))[2]['FirstName'] == "test1"
+    assert list(db.get_table("customers"))[3]['FirstName'] == "test2"
 
     # fill_null and part is NOT the same
     data = {"CustomerId": 5, "FirstName": "firstname", "LastName": "lastname", "Email": "email"}
@@ -177,16 +177,16 @@ def test_select(db):
 
     q = db.SELECT().FROM(table_name)
 
-    table = db.get_table(table_name)
+    table = list(db.get_table(table_name))
     
-    assert q.run() == table
+    assert list(q.run()) == table
     assert q.run(raw = True) == db.get_table_raw(table_name)
 
-    assert table[0] == db.SELECT().FROM(table_name).WHERE("CustomerId", 1).run()[0]
-    assert table[0] == db.SELECT().FROM(table_name).WHERE("CustomerId = 1").run()[0]
+    assert table[0] == list(db.SELECT().FROM(table_name).WHERE("CustomerId", 1).run())[0]
+    assert table[0] == list(db.SELECT().FROM(table_name).WHERE("CustomerId = 1").run())[0]
     
-    assert len(db.SELECT(["FirstName", "LastName"]).FROM("customers").run()[0]) == 2
-    assert len(db.SELECT(["FirstName", "LastName"]).FROM("customers").WHERE("CustomerId", 1).run()[0]) == 2
+    assert len(list(db.SELECT(["FirstName", "LastName"]).FROM("customers").run())[0]) == 2
+    assert len(list(db.SELECT(["FirstName", "LastName"]).FROM("customers").WHERE("CustomerId", 1).run())[0]) == 2
 
 def test_update(db):
     db1 = Database(db.path)
@@ -218,9 +218,9 @@ def test_insert_into(db):
 
     db1.INSERT_INTO(table_name).VALUES(data).run()
 
-    assert len(db1.get_table(table_name)) == len(db2.get_table(table_name)) + 1
+    assert len(list(db1.get_table(table_name))) == len(list(db2.get_table(table_name))) + 1
 
-    inserted_entry = db1.get_table(table_name)[-1]
+    inserted_entry = list(db1.get_table(table_name))[-1]
 
     assert inserted_entry['Email'] == data['Email']
     assert inserted_entry['LastName'] == data['LastName']
@@ -229,10 +229,10 @@ def test_insert_into(db):
 def test_run(db):
     query = Query().SELECT().FROM("customers")
 
-    assert query.run(db) == db.SELECT().FROM("customers").run()
+    assert list(query.run(db)) == list(db.SELECT().FROM("customers").run())
 
-    assert len(Query().SELECT(["FirstName", "LastName"]).FROM("customers").run(db)[0]) == 2
-    assert Query().SELECT(["FirstName", "LastName"]).FROM("customers").run(db)[0] == db.SELECT(["FirstName", "LastName"]).FROM("customers").run()[0]
+    assert len(list(Query().SELECT(["FirstName", "LastName"]).FROM("customers").run(db))[0]) == 2
+    assert list(Query().SELECT(["FirstName", "LastName"]).FROM("customers").run(db))[0] == list(db.SELECT(["FirstName", "LastName"]).FROM("customers").run())[0]
 
 def test_export_to_csv(db):
     out_dir = "tests/test_export_to_csv"
@@ -321,13 +321,12 @@ def test_DELETE_FROM():
 
     length = 10
 
-
     for i in range(length):
         db.add_entry({"name": f"name{i}"}, "table_name")
 
     db.DELETE_FROM("table_name").WHERE("id", 3).run()
 
-    assert len(db.get_table("table_name")) == length - 1
+    assert len(list(db.get_table("table_name"))) == length - 1
     
 def test_is_column(db):
     db: Database = db
