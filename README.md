@@ -14,7 +14,7 @@ The documentation can be found [here](https://htmlpreview.github.io/?https://git
 # Github Repo
 If you are interested in the open source code, click [here](https://github.com/BalderHolst/sqlite-integrated).
 
-See the latest changes and features of versin 0.0.6 [here](https://github.com/BalderHolst/sqlite-integrated/blob/dev/features.md).
+See the latest changes and features of version 0.0.6 [here](https://github.com/BalderHolst/sqlite-integrated/blob/dev/features.md).
 
 # How to use it!
 
