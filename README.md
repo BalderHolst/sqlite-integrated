@@ -243,8 +243,6 @@ Results: [DatabaseEntry(table: customers, data: {'FirstName': 'Tim'}), DatabaseE
 
 We can see that there are only two customers with a first name that starts with 't'.
 
-By default the database prints the SQL that is executed in the database, to the terminal. This can be disabled by passing `silent=True` to the `run` method.
-
 #### Insert Statement
 ```python
 from sqlite_integrated import Database
