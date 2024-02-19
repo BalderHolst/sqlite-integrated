@@ -1,8 +1,10 @@
 import pytest
 import shutil
 import os
+import sqlite3
 
 from sqlite_integrated import *
+from sqlite_integrated.errors import *
 
 
 @pytest.fixture
